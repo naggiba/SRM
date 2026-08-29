@@ -95,9 +95,9 @@ export default function OrdersList({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {error && <p className="text-red-500 text-sm bg-red-50 px-4 py-2 rounded-lg">{error}</p>}
-      <p className="text-sm text-gray-500">Усього: {orders.length}</p>
+      <p className="text-xs text-gray-400">Усього: {orders.length}</p>
 
       {orders.map((order) => {
         const isOpen = expanded === order.id;
@@ -115,9 +115,9 @@ export default function OrdersList({
         return (
           <div key={order.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             {/* Header row */}
-            <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 px-3 sm:px-4 py-3">
-              <div className="flex items-center gap-3 flex-1 min-w-0 w-full sm:w-auto">
-                <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 shrink-0 relative">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 px-3 py-2">
+              <div className="flex items-center gap-2.5 flex-1 min-w-0 w-full sm:w-auto">
+                <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 shrink-0 relative">
                   {firstPhoto ? (
                     <Image src={firstPhoto} alt="фото" fill className="object-cover" unoptimized />
                   ) : (
@@ -177,10 +177,10 @@ export default function OrdersList({
 
             {/* Expanded */}
             {isOpen && (
-              <div className="border-t border-gray-100 px-4 py-4">
+              <div className="border-t border-gray-100 px-3 py-3">
                 {/* Payment summary */}
                 {(total > 0 || clientPaid > 0 || wePaid > 0) && (
-                  <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                  <div className="mb-3 p-2.5 bg-blue-50 rounded-lg">
                     <div className="flex flex-wrap gap-4 text-sm">
                       {total > 0 && <span>Загалом: <b>{total.toFixed(2)}</b></span>}
                       {clientPaid > 0 && <span className="text-green-700">Клієнт оплатив: <b>{clientPaid.toFixed(2)}</b></span>}
@@ -207,40 +207,38 @@ export default function OrdersList({
                 )}
 
                 {order.note && (
-                  <p className="text-sm text-gray-600 mb-4 bg-gray-50 px-3 py-2 rounded-lg">{order.note}</p>
+                  <p className="text-sm text-gray-600 mb-3 bg-gray-50 px-3 py-2 rounded-lg">{order.note}</p>
                 )}
 
                 {order.items.length === 0 && <p className="text-sm text-gray-400">Товарів немає</p>}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {order.items.map((item, idx) => {
                     const colors = parseColors(item.colors);
                     return (
-                      <div key={item.id} className="border border-gray-200 rounded-xl overflow-hidden">
-                        <div className="h-48 bg-gray-100 relative">
+                      <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                        <div className="h-28 bg-gray-100 relative">
                           {item.photoPath ? (
                             <Image src={item.photoPath} alt={`Товар ${idx + 1}`} fill className="object-cover" unoptimized />
                           ) : (
-                            <div className="flex items-center justify-center h-full text-gray-400 text-3xl">📷</div>
+                            <div className="flex items-center justify-center h-full text-gray-400 text-2xl">📷</div>
                           )}
                         </div>
 
-                        <div className="p-3 space-y-1 text-sm">
+                        <div className="p-2 space-y-0.5 text-xs">
                           {item.supplier && (
-                            <p className="text-gray-700">
-                              <span className="text-gray-400 text-xs">Постачальник: </span>{item.supplier}
-                            </p>
+                            <p className="text-gray-700 truncate">{item.supplier}</p>
                           )}
                           {item.modelNumber && (
-                            <p className="font-mono text-gray-800 text-xs bg-gray-50 px-2 py-0.5 rounded">{item.modelNumber}</p>
+                            <p className="font-mono text-gray-800 bg-gray-50 px-1.5 py-0.5 rounded inline-block truncate">{item.modelNumber}</p>
                           )}
                           {item.price && <p className="text-green-700 font-semibold">{item.price}</p>}
-                          
+
                           {/* Colors with qty */}
                           {colors.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
+                            <div className="flex flex-wrap gap-1 mt-1">
                               {colors.map((c, ci) => (
-                                <span key={ci} className="text-xs bg-gray-100 px-2 py-0.5 rounded">
+                                <span key={ci} className="bg-gray-100 px-1.5 py-0.5 rounded">
                                   {c.color} × {c.qty}
                                 </span>
                               ))}
@@ -253,7 +251,7 @@ export default function OrdersList({
                 </div>
 
                 {canEdit && (
-                  <div className="mt-4 flex justify-end">
+                  <div className="mt-3 flex justify-end">
                     <a href={`/orders/${order.id}`} className="text-sm text-blue-600 hover:underline">
                       Редагувати замовлення →
                     </a>

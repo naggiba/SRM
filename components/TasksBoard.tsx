@@ -83,32 +83,31 @@ export default function TasksBoard({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
       {COLUMNS.map((col) => {
         const colOrders = grouped[col.status] || [];
         return (
-          <div key={col.status} className={`rounded-xl border-t-4 ${col.color} bg-white border border-gray-200`}>
+          <div key={col.status} className={`rounded-lg border-t-4 ${col.color} bg-white border border-gray-200`}>
             {/* Header */}
-            <div className={`px-4 py-3 ${col.headerBg} border-b border-gray-100`}>
+            <div className={`px-3 py-2 ${col.headerBg} border-b border-gray-100`}>
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-gray-800 text-sm">{col.title}</h3>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${col.badge}`}>
+                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${col.badge}`}>
                   {colOrders.length}
                 </span>
               </div>
-              <p className="text-xs text-gray-500 mt-0.5">{col.hint}</p>
             </div>
 
             {/* Список задач */}
-            <div className="divide-y divide-gray-100 min-h-[80px]">
+            <div className="divide-y divide-gray-100 min-h-[60px]">
               {colOrders.length === 0 && (
-                <p className="text-xs text-gray-300 text-center py-8">Немає задач</p>
+                <p className="text-xs text-gray-300 text-center py-6">Немає задач</p>
               )}
 
               {colOrders.map((order) => {
                 const next = getNextStatus(order.status);
                 return (
-                  <div key={order.id} className="px-4 py-3 hover:bg-gray-50 transition">
+                  <div key={order.id} className="px-3 py-2 hover:bg-gray-50 transition">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <a
@@ -117,7 +116,7 @@ export default function TasksBoard({
                         >
                           {order.clientName || "Без клієнта"}
                         </a>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                        <div className="flex items-center gap-1.5 mt-0.5 text-xs text-gray-500">
                           {order.totalPrice && (
                             <span>{order.totalPrice} ¥</span>
                           )}
@@ -130,9 +129,6 @@ export default function TasksBoard({
                           )}
                           <span>{order.orderDate || new Date(order.createdAt).toLocaleDateString("uk-UA")}</span>
                         </div>
-                        {order.note && (
-                          <p className="text-xs text-gray-400 mt-1 truncate">{order.note}</p>
-                        )}
                       </div>
 
                       {canEdit && next && (
