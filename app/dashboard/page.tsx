@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
 import { db } from "@/lib/db";
 import { clients, orders } from "@/lib/schema";
-import { count } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 
 const roleLabels: Record<string, string> = {
   ADMIN: "Адміністратор",
@@ -25,6 +25,7 @@ export default async function DashboardPage() {
   const role = (session.user as { role: string }).role;
   const [{ value: clientCount }] = await db.select({ value: count() }).from(clients);
   const [{ value: orderCount }] = await db.select({ value: count() }).from(orders);
+  const [{ value: sentCount }] = await db.select({ value: count() }).from(orders).where(eq(orders.status, "SENT_TO_CARGO"));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -55,7 +56,9 @@ export default async function DashboardPage() {
           <a href="/orders" className="block">
             <StatCard label="Замовлення" value={String(orderCount)} note="переглянути список →" />
           </a>
-          <StatCard label="Товари в дорозі" value="—" note="незабаром" />
+          <a href="/orders" className="block">
+            <StatCard label="Відправлені товари" value={String(sentCount)} note="статус: На карго →" />
+          </a>
           <a href="/clients" className="block">
             <StatCard label="Клієнти" value={String(clientCount)} note="переглянути список →" />
           </a>
