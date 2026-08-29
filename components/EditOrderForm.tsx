@@ -409,40 +409,39 @@ export default function EditOrderForm({
   }
 
   // ── Payment calculations ──
-  const total = parseFloat(totalPrice) || 0;
+  const total = parseFloat(totalPrice) || 0; // ¥
 
-  // Клієнт: конвертуємо UAH → CNY якщо є курс
-  const clientPaidTotalCNY = paymentsState
+  // Клієнт: оплати в ¥ (CNY прямо, UAH ÷ курс)
+  const clientPaidCNY = paymentsState
     .filter((p) => p.type === "CLIENT")
     .reduce((sum, p) => {
       const amt = parseFloat(p.amount) || 0;
-      if (p.currency === "UAH" && p.exchangeRate) {
-        return sum + (amt / (parseFloat(p.exchangeRate) || 1));
+      if (p.currency === "UAH") {
+        const rate = parseFloat(p.exchangeRate) || 0;
+        return sum + (rate > 0 ? amt / rate : 0);
       }
       return sum + amt;
     }, 0);
 
-  // Клієнт в UAH (для відображення надходжень)
-  const clientPaidTotalUAH = paymentsState
-    .filter((p) => p.type === "CLIENT")
-    .reduce((sum, p) => {
-      const amt = parseFloat(p.amount) || 0;
-      if (p.currency === "UAH") return sum + amt;
-      return sum; // CNY не рахуємо в UAH
-    }, 0);
+  // Клієнт: окремо сума в ₴ для відображення
+  const clientPaidUAH = paymentsState
+    .filter((p) => p.type === "CLIENT" && p.currency === "UAH")
+    .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
 
-  const clientPaidTotal = clientPaidTotalCNY;
-
-  const wePaidTotal = paymentsState
+  // Постачальник — завжди ¥
+  const wePaidCNY = paymentsState
     .filter((p) => p.type === "SUPPLIER")
     .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
 
-  const totalExpenses = expensesState
+  // Додаткові витрати — в ¥
+  const totalExpensesCNY = expensesState
     .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
 
-  const debtFromClient = total - clientPaidTotal;
-  // Заробіток = те що заплатив клієнт (в CNY) - те що ми заплатили постачальнику
-  const profit = clientPaidTotal - wePaidTotal;
+  // Борг клієнта = вартість замовлення − скільки заплатив у ¥
+  const debtFromClient = total - clientPaidCNY;
+
+  // Заробіток = надходження ¥ − витрати постачальнику ¥ − доп витрати ¥
+  const profit = clientPaidCNY - wePaidCNY - totalExpensesCNY;
 
   // ── Auto-calculate total from items ──
   const calculatedTotal = items.reduce((sum, item) => {
@@ -490,17 +489,20 @@ export default function EditOrderForm({
           </div>
           <div className="bg-green-50 rounded-lg p-3">
             <p className="text-xs text-green-600 mb-1">Клієнт оплатив</p>
-            <p className="text-xl font-bold text-green-700">{clientPaidTotal.toFixed(2)}</p>
+            <p className="text-xl font-bold text-green-700">{clientPaidCNY.toFixed(2)} ¥</p>
+            {clientPaidUAH > 0 && (
+              <p className="text-xs text-green-500">{clientPaidUAH.toFixed(0)} ₴</p>
+            )}
           </div>
           <div className="bg-orange-50 rounded-lg p-3">
             <p className="text-xs text-orange-600 mb-1">Ми оплатили</p>
-            <p className="text-xl font-bold text-orange-700">{wePaidTotal.toFixed(2)}</p>
+            <p className="text-xl font-bold text-orange-700">{wePaidCNY.toFixed(2)} ¥</p>
           </div>
         </div>
 
         {total > 0 && (
           <div className={`text-sm px-3 py-2 rounded-lg ${debtFromClient > 0 ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
-            {debtFromClient > 0 ? `Борг клієнта: ${debtFromClient.toFixed(2)}` : `Переплата: ${Math.abs(debtFromClient).toFixed(2)}`}
+            {debtFromClient > 0.001 ? `Борг клієнта: ${debtFromClient.toFixed(2)} ¥` : debtFromClient < -0.001 ? `Переплата: ${Math.abs(debtFromClient).toFixed(2)} ¥` : "Сплачено повністю"}
           </div>
         )}
 
@@ -646,7 +648,7 @@ export default function EditOrderForm({
               <div key={e.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-gray-800">{e.description}</span>
-                  <span className="text-sm font-semibold text-orange-700">{e.amount} ₴</span>
+                  <span className="text-sm font-semibold text-orange-700">{e.amount} ¥</span>
                 </div>
                 <button
                   type="button"
@@ -665,7 +667,7 @@ export default function EditOrderForm({
               </div>
             ))}
             <div className="text-sm font-semibold text-orange-700 text-right pt-1">
-              Всього витрат: {totalExpenses.toFixed(2)} ₴
+              Всього витрат: {totalExpensesCNY.toFixed(2)} ¥
             </div>
           </div>
         ) : (
@@ -684,7 +686,7 @@ export default function EditOrderForm({
             />
           </div>
           <div className="w-32">
-            <label className="block text-xs text-gray-500 mb-1">Сума (₴)</label>
+            <label className="block text-xs text-gray-500 mb-1">Сума (¥)</label>
             <input
               value={newExpenseAmount}
               onChange={(e) => setNewExpenseAmount(e.target.value)}
@@ -727,16 +729,16 @@ export default function EditOrderForm({
           </div>
           <div className="bg-green-50 rounded-xl p-4">
             <p className="text-xs text-green-500 mb-1">Надходження від клієнта</p>
-            <p className="text-2xl font-bold text-green-700">{clientPaidTotalCNY.toFixed(2)} ¥</p>
-            {clientPaidTotalUAH > 0 && (
-              <p className="text-xs text-green-400 mt-0.5">+ {clientPaidTotalUAH.toFixed(0)} ₴</p>
+            <p className="text-2xl font-bold text-green-700">{clientPaidCNY.toFixed(2)} ¥</p>
+            {clientPaidUAH > 0 && (
+              <p className="text-xs text-green-500 mt-0.5">{clientPaidUAH.toFixed(0)} ₴</p>
             )}
           </div>
           <div className="bg-orange-50 rounded-xl p-4">
-            <p className="text-xs text-orange-500 mb-1">Ми витратили</p>
-            <p className="text-2xl font-bold text-orange-700">{wePaidTotal.toFixed(2)} ¥</p>
-            {totalExpenses > 0 && (
-              <p className="text-xs text-orange-400 mt-0.5">+ {totalExpenses.toFixed(0)} ₴ витрат</p>
+            <p className="text-xs text-orange-500 mb-1">Витрати</p>
+            <p className="text-2xl font-bold text-orange-700">{wePaidCNY.toFixed(2)} ¥</p>
+            {totalExpensesCNY > 0 && (
+              <p className="text-xs text-orange-400 mt-0.5">+ {totalExpensesCNY.toFixed(2)} ¥ доп.</p>
             )}
           </div>
           <div className={`rounded-xl p-4 ${profit >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
@@ -746,12 +748,12 @@ export default function EditOrderForm({
             </p>
           </div>
         </div>
-        {debtFromClient > 0 && (
+        {debtFromClient > 0.001 && (
           <div className="bg-red-50 text-red-700 text-sm px-4 py-2 rounded-lg">
             Борг клієнта: {debtFromClient.toFixed(2)} ¥
           </div>
         )}
-        {debtFromClient < 0 && (
+        {debtFromClient < -0.001 && (
           <div className="bg-green-50 text-green-700 text-sm px-4 py-2 rounded-lg">
             Переплата клієнта: {Math.abs(debtFromClient).toFixed(2)} ¥
           </div>
