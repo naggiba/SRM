@@ -19,16 +19,57 @@ export default function ProductsCatalog({
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
+  // Зберігаємо які постачальники розгорнуті (за замовчуванням всі)
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
   const fetchProducts = useCallback(async (q: string) => {
     const res = await fetch(`/api/products${q ? `?q=${encodeURIComponent(q)}` : ""}`);
-    if (res.ok) setList(await res.json());
+    if (res.ok) {
+      const data: Product[] = await res.json();
+      setList(data);
+      // При пошуку розгортаємо всі групи
+      if (q) {
+        const suppliers = new Set(data.map((p) => p.supplier ?? "Без постачальника"));
+        setOpenGroups(suppliers);
+      }
+    }
   }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => fetchProducts(search), 300);
     return () => clearTimeout(timer);
   }, [search, fetchProducts]);
+
+  // Групуємо по постачальнику
+  const grouped = list.reduce<Record<string, Product[]>>((acc, product) => {
+    const key = product.supplier?.trim() || "Без постачальника";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(product);
+    return acc;
+  }, {});
+
+  const supplierNames = Object.keys(grouped).sort((a, b) => {
+    if (a === "Без постачальника") return 1;
+    if (b === "Без постачальника") return -1;
+    return a.localeCompare(b);
+  });
+
+  function toggleGroup(supplier: string) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(supplier)) next.delete(supplier);
+      else next.add(supplier);
+      return next;
+    });
+  }
+
+  function expandAll() {
+    setOpenGroups(new Set(supplierNames));
+  }
+
+  function collapseAll() {
+    setOpenGroups(new Set());
+  }
 
   async function handleDelete(id: string) {
     if (!confirm("Видалити товар з каталогу?")) return;
@@ -44,12 +85,16 @@ export default function ProductsCatalog({
       if (exists) return prev.map((p) => (p.id === product.id ? product : p));
       return [product, ...prev];
     });
+    // Розгортаємо групу нового товару
+    const supplier = product.supplier?.trim() || "Без постачальника";
+    setOpenGroups((prev) => new Set([...prev, supplier]));
     setShowForm(false);
     setEditProduct(null);
   }
 
   return (
     <div>
+      {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between mb-6">
         <div className="relative w-full sm:w-72">
           <input
@@ -63,14 +108,22 @@ export default function ProductsCatalog({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
           </svg>
         </div>
-        {canEdit && (
-          <button
-            onClick={() => { setEditProduct(null); setShowForm(true); }}
-            className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-          >
-            + Новий товар
+        <div className="flex items-center gap-2">
+          <button onClick={expandAll} className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100 transition">
+            Розгорнути всі
           </button>
-        )}
+          <button onClick={collapseAll} className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100 transition">
+            Згорнути всі
+          </button>
+          {canEdit && (
+            <button
+              onClick={() => { setEditProduct(null); setShowForm(true); }}
+              className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+            >
+              + Новий товар
+            </button>
+          )}
+        </div>
       </div>
 
       {showForm && (
@@ -81,79 +134,115 @@ export default function ProductsCatalog({
         />
       )}
 
-      {/* Grid каталогу */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {list.map((product) => (
-          <div key={product.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition group">
-            {/* Фото */}
-            <div className="relative aspect-square bg-gray-100">
-              {product.photoPath ? (
-                <Image
-                  src={product.photoPath}
-                  alt={product.modelNumber}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-300">
-                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      {/* Акордеон по постачальнику */}
+      {list.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          {search ? "Нічого не знайдено" : "Каталог порожній — додайте перший товар"}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {supplierNames.map((supplier) => {
+            const products = grouped[supplier];
+            const isOpen = openGroups.has(supplier);
+            return (
+              <div key={supplier} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                {/* Заголовок групи */}
+                <button
+                  onClick={() => toggleGroup(supplier)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-800">{supplier}</p>
+                      <p className="text-xs text-gray-400">{products.length} {products.length === 1 ? "товар" : products.length < 5 ? "товари" : "товарів"}</p>
+                    </div>
+                  </div>
+                  <svg
+                    className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
-                </div>
-              )}
-            </div>
+                </button>
 
-            {/* Інфо */}
-            <div className="p-3">
-              <p className="font-mono text-sm font-semibold text-gray-800 truncate">{product.modelNumber}</p>
-              {product.supplier && (
-                <p className="text-xs text-gray-500 truncate mt-0.5">{product.supplier}</p>
-              )}
-              {product.price && (
-                <p className="text-sm font-medium text-green-700 mt-1">{product.price}</p>
-              )}
-              {product.note && (
-                <p className="text-xs text-gray-400 truncate mt-0.5">{product.note}</p>
-              )}
+                {/* Товари */}
+                {isOpen && (
+                  <div className="border-t border-gray-100 p-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                      {products.map((product) => (
+                        <div key={product.id} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition">
+                          {/* Фото */}
+                          <div className="relative aspect-square bg-gray-100">
+                            {product.photoPath ? (
+                              <Image
+                                src={product.photoPath}
+                                alt={product.modelNumber}
+                                fill
+                                className="object-cover"
+                                unoptimized
+                              />
+                            ) : (
+                              <div className="flex items-center justify-center h-full text-gray-300">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
 
-              {/* Кнопки */}
-              {(canEdit || canDelete) && (
-                <div className="flex gap-2 mt-3 pt-2 border-t border-gray-100">
-                  {canEdit && (
-                    <button
-                      onClick={() => { setEditProduct(product); setShowForm(true); }}
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      Редагувати
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button
-                      onClick={() => handleDelete(product.id)}
-                      disabled={loading}
-                      className="text-xs text-red-500 hover:underline ml-auto"
-                    >
-                      Видалити
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+                          {/* Інфо */}
+                          <div className="p-3">
+                            <p className="font-mono text-sm font-semibold text-gray-800 truncate">{product.modelNumber}</p>
+                            {product.price && (
+                              <p className="text-sm font-medium text-green-700 mt-1">{product.price}</p>
+                            )}
+                            {product.note && (
+                              <p className="text-xs text-gray-400 truncate mt-0.5">{product.note}</p>
+                            )}
 
-        {list.length === 0 && (
-          <div className="col-span-full text-center py-16 text-gray-400">
-            {search ? "Нічого не знайдено" : "Каталог порожній — додайте перший товар"}
-          </div>
-        )}
-      </div>
+                            {(canEdit || canDelete) && (
+                              <div className="flex gap-2 mt-3 pt-2 border-t border-gray-200">
+                                {canEdit && (
+                                  <button
+                                    onClick={() => { setEditProduct(product); setShowForm(true); }}
+                                    className="text-xs text-blue-600 hover:underline"
+                                  >
+                                    Редагувати
+                                  </button>
+                                )}
+                                {canDelete && (
+                                  <button
+                                    onClick={() => handleDelete(product.id)}
+                                    disabled={loading}
+                                    className="text-xs text-red-500 hover:underline ml-auto"
+                                  >
+                                    Видалити
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-      <p className="text-xs text-gray-400 mt-4">Всього товарів: {list.length}</p>
+      <p className="text-xs text-gray-400 mt-4">Всього товарів: {list.length} • Постачальників: {supplierNames.length}</p>
     </div>
   );
 }
+
 
 // ── Форма додавання/редагування ──────────────────────────────────────────────
 
