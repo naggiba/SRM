@@ -18,21 +18,34 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, credentials.email))
-          .limit(1);
+        try {
+          const [user] = await db
+            .select()
+            .from(users)
+            .where(eq(users.email, credentials.email))
+            .limit(1);
 
-        if (!user) return null;
+          if (!user) {
+            console.log("User not found:", credentials.email);
+            return null;
+          }
 
-        const passwordMatch = await bcrypt.compare(
-          credentials.password,
-          user.password
-        );
-        if (!passwordMatch) return null;
+          const passwordMatch = await bcrypt.compare(
+            credentials.password,
+            user.password
+          );
 
-        return { id: user.id, name: user.name, email: user.email, role: user.role };
+          if (!passwordMatch) {
+            console.log("Password mismatch for:", credentials.email);
+            return null;
+          }
+
+          console.log("Login success:", credentials.email, "role:", user.role);
+          return { id: user.id, name: user.name, email: user.email, role: user.role };
+        } catch (e) {
+          console.error("Auth error:", e);
+          return null;
+        }
       },
     }),
   ],
