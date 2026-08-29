@@ -115,60 +115,64 @@ export default function OrdersList({
         return (
           <div key={order.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             {/* Header row */}
-            <div className="flex items-center gap-3 px-4 py-3">
-              <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 shrink-0 relative">
-                {firstPhoto ? (
-                  <Image src={firstPhoto} alt="фото" fill className="object-cover" unoptimized />
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 px-3 sm:px-4 py-3">
+              <div className="flex items-center gap-3 flex-1 min-w-0 w-full sm:w-auto">
+                <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 shrink-0 relative">
+                  {firstPhoto ? (
+                    <Image src={firstPhoto} alt="фото" fill className="object-cover" unoptimized />
+                  ) : (
+                    <span className="flex items-center justify-center h-full text-gray-400 text-xl">📦</span>
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-800 truncate">
+                    {order.clientName || "Без клієнта"}
+                    {order.deliveryType && (
+                      <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${order.deliveryType === "AIR" ? "bg-sky-100 text-sky-700" : "bg-amber-100 text-amber-700"}`}>
+                        {DELIVERY_LABELS[order.deliveryType] || order.deliveryType}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate">
+                    {order.orderDate ? `${order.orderDate}` : new Date(order.createdAt).toLocaleDateString("uk-UA")} · {order.items.length} товарів
+                    {total > 0 && ` · ${total.toFixed(0)}`}
+                    {debt > 0 && <span className="text-red-500 ml-1">(борг: {debt.toFixed(0)})</span>}
+                    {order.estimatedShipDate && <span className="ml-1">· відпр. {order.estimatedShipDate}</span>}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 ml-auto sm:ml-0 shrink-0">
+                {canEdit ? (
+                  <select
+                    value={order.status}
+                    onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                    className={`text-xs font-semibold px-2 py-1 rounded-full border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${STATUS_COLORS[order.status] ?? "bg-gray-100"}`}
+                  >
+                    {ALL_STATUSES.map((s) => (
+                      <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>
+                    ))}
+                  </select>
                 ) : (
-                  <span className="flex items-center justify-center h-full text-gray-400 text-xl">📦</span>
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_COLORS[order.status] ?? "bg-gray-100"}`}>
+                    {STATUS_LABELS[order.status] ?? order.status}
+                  </span>
+                )}
+
+                <button
+                  onClick={() => setExpanded(isOpen ? null : order.id)}
+                  className="text-gray-400 hover:text-gray-700 transition text-lg leading-none"
+                >
+                  {isOpen ? "▲" : "▼"}
+                </button>
+
+                {canDelete && (
+                  <button onClick={() => handleDelete(order.id)} className="text-red-400 hover:text-red-600 transition text-sm">
+                    ✕
+                  </button>
                 )}
               </div>
-
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-800 truncate">
-                  {order.clientName || "Без клієнта"}
-                  {order.deliveryType && (
-                    <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${order.deliveryType === "AIR" ? "bg-sky-100 text-sky-700" : "bg-amber-100 text-amber-700"}`}>
-                      {DELIVERY_LABELS[order.deliveryType] || order.deliveryType}
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {order.orderDate ? `${order.orderDate}` : new Date(order.createdAt).toLocaleDateString("uk-UA")} · {order.items.length} товарів
-                  {total > 0 && ` · ${total.toFixed(0)}`}
-                  {debt > 0 && <span className="text-red-500 ml-1">(борг: {debt.toFixed(0)})</span>}
-                  {order.estimatedShipDate && <span className="ml-1">· відпр. {order.estimatedShipDate}</span>}
-                </p>
-              </div>
-
-              {canEdit ? (
-                <select
-                  value={order.status}
-                  onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                  className={`text-xs font-semibold px-2 py-1 rounded-full border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${STATUS_COLORS[order.status] ?? "bg-gray-100"}`}
-                >
-                  {ALL_STATUSES.map((s) => (
-                    <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>
-                  ))}
-                </select>
-              ) : (
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_COLORS[order.status] ?? "bg-gray-100"}`}>
-                  {STATUS_LABELS[order.status] ?? order.status}
-                </span>
-              )}
-
-              <button
-                onClick={() => setExpanded(isOpen ? null : order.id)}
-                className="text-gray-400 hover:text-gray-700 transition ml-1 text-lg leading-none"
-              >
-                {isOpen ? "▲" : "▼"}
-              </button>
-
-              {canDelete && (
-                <button onClick={() => handleDelete(order.id)} className="text-red-400 hover:text-red-600 transition text-sm ml-1">
-                  ✕
-                </button>
-              )}
             </div>
 
             {/* Expanded */}

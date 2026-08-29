@@ -9,7 +9,7 @@ export default async function FinancePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center gap-3">
           <a href="/dashboard" className="text-sm text-gray-500 hover:text-gray-800 transition">
             ← Дашборд
@@ -19,7 +19,7 @@ export default async function FinancePage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <FinanceDashboard />
       </main>
     </div>

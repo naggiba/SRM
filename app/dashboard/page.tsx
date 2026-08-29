@@ -37,18 +37,18 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+      <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h1 className="text-xl font-bold text-gray-800">CRM Система</h1>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm font-medium text-gray-800">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="text-right min-w-0">
+              <p className="text-sm font-medium text-gray-800 truncate">
                 {session.user?.name}
               </p>
-              <p className="text-xs text-gray-500">{session.user?.email}</p>
+              <p className="text-xs text-gray-500 truncate">{session.user?.email}</p>
             </div>
             <span
-              className={`text-xs font-semibold px-2.5 py-1 rounded-full ${roleColors[role] ?? "bg-gray-100 text-gray-700"}`}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${roleColors[role] ?? "bg-gray-100 text-gray-700"}`}
             >
               {roleLabels[role] ?? role}
             </span>
@@ -58,7 +58,7 @@ export default async function DashboardPage() {
       </header>
 
       {/* Content */}
-      <main className="max-w-6xl mx-auto px-6 py-10">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           <a href="/orders" className="block">
             <StatCard label="Замовлення" value={String(orderCount)} note="переглянути список →" />

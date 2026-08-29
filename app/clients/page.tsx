@@ -35,7 +35,7 @@ export default async function ClientsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <a
@@ -50,7 +50,7 @@ export default async function ClientsPage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-10">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <ClientsTable
           initialClients={allClients}
           ordersByClient={ordersByClient}

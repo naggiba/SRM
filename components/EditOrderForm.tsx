@@ -534,7 +534,7 @@ export default function EditOrderForm({
                     <Image src={p.previewUrl} alt="чек" fill className="object-cover" unoptimized />
                   </div>
                 )}
-                <div className="flex-1 grid grid-cols-2 gap-2">
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input
                     value={p.amount}
                     onChange={(e) => updatePayment(p.localId, "amount", e.target.value)}
@@ -558,7 +558,7 @@ export default function EditOrderForm({
               </div>
               {/* Валюта — тільки для CLIENT */}
               {p.type === "CLIENT" && (
-                <div className="flex items-center gap-3 pl-1">
+                <div className="flex items-center gap-3 flex-wrap pl-1">
                   <span className="text-xs text-gray-500">Валюта:</span>
                   <label className="flex items-center gap-1 text-sm cursor-pointer">
                     <input
@@ -675,8 +675,8 @@ export default function EditOrderForm({
         )}
 
         {/* Форма додавання */}
-        <div className="flex gap-2 items-end">
-          <div className="flex-1">
+        <div className="flex gap-2 items-end flex-wrap">
+          <div className="flex-1 min-w-[120px]">
             <label className="block text-xs text-gray-500 mb-1">Назва витрати</label>
             <input
               value={newExpenseDesc}

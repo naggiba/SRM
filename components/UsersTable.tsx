@@ -59,7 +59,7 @@ export default function UsersTable({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <p className="text-gray-600 text-sm">Усього: {list.length}</p>
         <button
           onClick={handleCreate}
@@ -83,8 +83,8 @@ export default function UsersTable({
         />
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden overflow-x-auto">
+        <table className="w-full text-sm min-w-[600px]">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="text-left px-4 py-3 text-gray-600 font-medium">Ім&apos;я</th>

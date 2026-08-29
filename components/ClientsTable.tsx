@@ -130,6 +130,76 @@ export default function ClientsTable({
       )}
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* Мобільні картки */}
+        <div className="sm:hidden divide-y divide-gray-100">
+          {list.map((client) => {
+            const clientOrders = getClientOrders(client);
+            const isExpanded = expanded === client.id;
+            return (
+              <div key={client.id} className="p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-gray-800">{client.name}</p>
+                  <span className="text-xs text-gray-400">{new Date(client.createdAt).toLocaleDateString("uk-UA")}</span>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {client.telegram && (
+                    <a href={`https://t.me/${client.telegram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
+                      {client.telegram.startsWith("@") ? client.telegram : `@${client.telegram}`}
+                    </a>
+                  )}
+                  {client.cargoCode && (
+                    <span className="font-mono bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{client.cargoCode}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 pt-1">
+                  {clientOrders.length > 0 ? (
+                    <button onClick={() => setExpanded(isExpanded ? null : client.id)} className="text-blue-600 text-xs hover:underline">
+                      {clientOrders.length} замовлень {isExpanded ? "▲" : "▼"}
+                    </button>
+                  ) : (
+                    <span className="text-xs text-gray-400">0 замовлень</span>
+                  )}
+                  {canEdit && (
+                    <button onClick={() => handleEdit(client)} className="text-blue-600 text-xs hover:underline ml-auto">Редагувати</button>
+                  )}
+                  {canDelete && (
+                    <button onClick={() => handleDelete(client.id)} disabled={loading} className="text-red-500 text-xs hover:underline disabled:opacity-50">Видалити</button>
+                  )}
+                </div>
+                {isExpanded && clientOrders.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-gray-100">
+                    {clientOrders.map((order) => (
+                      <a key={order.id} href={`/orders/${order.id}`} className="block bg-gray-50 rounded-lg px-3 py-2 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[order.status] || "bg-gray-100"}`}>
+                            {STATUS_LABELS[order.status] || order.status}
+                          </span>
+                          <span className="text-xs text-gray-500">{order.orderDate || new Date(order.createdAt).toLocaleDateString("uk-UA")}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          {order.totalPrice && <span className="font-medium text-gray-800">{order.totalPrice} ¥</span>}
+                          {order.deliveryType && (
+                            <span className={`px-1.5 py-0.5 rounded ${order.deliveryType === "AIR" ? "bg-sky-100 text-sky-700" : "bg-amber-100 text-amber-700"}`}>
+                              {order.deliveryType === "AIR" ? "Авіа" : "ЖД"}
+                            </span>
+                          )}
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {list.length === 0 && (
+            <div className="px-4 py-10 text-center text-gray-400">
+              {search ? "Нічого не знайдено" : "Клієнтів ще немає"}
+            </div>
+          )}
+        </div>
+
+        {/* Десктоп таблиця */}
+        <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -262,6 +332,7 @@ export default function ClientsTable({
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       <p className="text-xs text-gray-400 mt-3">Усього: {list.length}</p>
