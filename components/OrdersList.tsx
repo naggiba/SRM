@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import type { Order, OrderItem, Payment } from "@/lib/schema";
 
 interface ColorQty {
@@ -101,8 +100,7 @@ export default function OrdersList({
 
       {orders.map((order) => {
         const isOpen = expanded === order.id;
-        const firstPhoto = order.items.find((i) => i.photoPath)?.photoPath;
-        
+
         const clientPaid = order.payments
           ?.filter(p => p.type === "CLIENT")
           .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) || 0;
@@ -117,14 +115,6 @@ export default function OrdersList({
             {/* Header row */}
             <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 px-3 py-2">
               <div className="flex items-center gap-2.5 flex-1 min-w-0 w-full sm:w-auto">
-                <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 shrink-0 relative">
-                  {firstPhoto ? (
-                    <Image src={firstPhoto} alt="фото" fill className="object-cover" unoptimized />
-                  ) : (
-                    <span className="flex items-center justify-center h-full text-gray-400 text-xl">📦</span>
-                  )}
-                </div>
-
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-800 truncate">
                     {order.clientName || "Без клієнта"}
@@ -187,22 +177,6 @@ export default function OrdersList({
                       {wePaid > 0 && <span className="text-orange-700">Ми оплатили: <b>{wePaid.toFixed(2)}</b></span>}
                       {debt > 0 && <span className="text-red-600">Борг: <b>{debt.toFixed(2)}</b></span>}
                     </div>
-                    
-                    {/* Payment photos */}
-                    {order.payments && order.payments.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {order.payments.filter(p => p.photoPath).map((p) => (
-                          <div key={p.id} className="relative group">
-                            <div className="w-12 h-12 rounded overflow-hidden bg-gray-200 relative">
-                              <Image src={p.photoPath!} alt="чек" fill className="object-cover" unoptimized />
-                            </div>
-                            <span className={`absolute -top-1 -right-1 text-xs px-1 rounded ${p.type === "CLIENT" ? "bg-green-500 text-white" : "bg-orange-500 text-white"}`}>
-                              {p.amount}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -212,39 +186,29 @@ export default function OrdersList({
 
                 {order.items.length === 0 && <p className="text-sm text-gray-400">Товарів немає</p>}
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {order.items.map((item, idx) => {
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {order.items.map((item) => {
                     const colors = parseColors(item.colors);
                     return (
-                      <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                        <div className="h-28 bg-gray-100 relative">
-                          {item.photoPath ? (
-                            <Image src={item.photoPath} alt={`Товар ${idx + 1}`} fill className="object-cover" unoptimized />
-                          ) : (
-                            <div className="flex items-center justify-center h-full text-gray-400 text-2xl">📷</div>
-                          )}
-                        </div>
+                      <div key={item.id} className="border border-gray-200 rounded-lg p-2.5 space-y-0.5 text-xs">
+                        {item.supplier && (
+                          <p className="text-gray-700 truncate">{item.supplier}</p>
+                        )}
+                        {item.modelNumber && (
+                          <p className="font-mono text-gray-800 bg-gray-50 px-1.5 py-0.5 rounded inline-block truncate">{item.modelNumber}</p>
+                        )}
+                        {item.price && <p className="text-green-700 font-semibold">{item.price}</p>}
 
-                        <div className="p-2 space-y-0.5 text-xs">
-                          {item.supplier && (
-                            <p className="text-gray-700 truncate">{item.supplier}</p>
-                          )}
-                          {item.modelNumber && (
-                            <p className="font-mono text-gray-800 bg-gray-50 px-1.5 py-0.5 rounded inline-block truncate">{item.modelNumber}</p>
-                          )}
-                          {item.price && <p className="text-green-700 font-semibold">{item.price}</p>}
-
-                          {/* Colors with qty */}
-                          {colors.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {colors.map((c, ci) => (
-                                <span key={ci} className="bg-gray-100 px-1.5 py-0.5 rounded">
-                                  {c.color} × {c.qty}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        {/* Colors with qty */}
+                        {colors.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {colors.map((c, ci) => (
+                              <span key={ci} className="bg-gray-100 px-1.5 py-0.5 rounded">
+                                {c.color} × {c.qty}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
