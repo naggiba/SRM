@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { orders, orderItems, payments, Order, OrderItem, Payment } from "@/lib/schema";
 import { desc } from "drizzle-orm";
-import OrdersView from "@/components/OrdersView";
+import OrdersList from "@/components/OrdersList";
 
 export default async function OrdersPage() {
   const session = await getServerSession(authOptions);
@@ -12,7 +12,6 @@ export default async function OrdersPage() {
 
   const role = (session.user as { role: string }).role;
 
-  // Паралельні запити
   const [allOrders, allItems, allPayments] = await Promise.all([
     db.select().from(orders).orderBy(desc(orders.createdAt)) as Promise<Order[]>,
     db.select().from(orderItems) as Promise<OrderItem[]>,
@@ -49,9 +48,9 @@ export default async function OrdersPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-10">
-        <OrdersView
-          orders={data}
+      <main className="max-w-6xl mx-auto px-6 py-10">
+        <OrdersList
+          initialOrders={data}
           canEdit={role !== "VIEWER"}
           canDelete={role === "ADMIN"}
         />
