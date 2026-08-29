@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
+import BottomNav from "@/components/BottomNav";
+import MobileShell from "@/components/MobileShell";
 
 export const metadata: Metadata = {
   title: "CRM — Викуп товарів",
@@ -21,7 +23,10 @@ export default function RootLayout({
   return (
     <html lang="uk">
       <body className="bg-gray-50 text-gray-900 antialiased">
-        <Providers>{children}</Providers>
+        <Providers>
+          <MobileShell>{children}</MobileShell>
+          <BottomNav />
+        </Providers>
       </body>
     </html>
   );

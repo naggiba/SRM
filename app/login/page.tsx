@@ -33,17 +33,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-gray-50 to-gray-100 px-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-md p-8">
-          <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
-            CRM Система
-          </h1>
-          <p className="text-center text-gray-500 text-sm mb-8">
-            Управління замовленнями з Китаю
-          </p>
+        <div className="flex flex-col items-center mb-6">
+          <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-200 mb-3">
+            <span className="text-white text-2xl font-bold">C</span>
+          </div>
+          <h1 className="text-xl font-bold text-gray-800">CRM Система</h1>
+          <p className="text-gray-500 text-sm mt-1">Управління замовленнями з Китаю</p>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 border border-gray-100 p-6 sm:p-8">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Email
@@ -53,7 +54,9 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                autoComplete="email"
+                inputMode="email"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-base"
                 placeholder="admin@crm.com"
               />
             </div>
@@ -67,7 +70,8 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                autoComplete="current-password"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-base"
                 placeholder="••••••••"
               />
             </div>
@@ -81,7 +85,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm active:scale-[0.98]"
             >
               {loading ? "Вхід..." : "Увійти"}
             </button>

@@ -24,11 +24,16 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3">
+      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 py-3 shadow-sm">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <h1 className="text-lg font-bold text-gray-800">CRM Система</h1>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+              <span className="text-white text-sm font-bold">C</span>
+            </div>
+            <h1 className="text-lg font-bold text-gray-800">CRM Система</h1>
+          </div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <div className="text-right min-w-0">
+            <div className="text-right min-w-0 hidden sm:block">
               <p className="text-sm font-medium text-gray-800 truncate leading-tight">
                 {session.user?.name}
               </p>
@@ -46,19 +51,25 @@ export default async function DashboardPage() {
 
       {/* Content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
+        <p className="text-sm text-gray-500 mb-4 sm:hidden">
+          Привіт, <span className="font-medium text-gray-700">{session.user?.name}</span>
+        </p>
+
         {/* Головні розділи */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-          <NavCard href="/orders" title="Замовлення" desc="Список, фото товарів" primary />
-          <NavCard href="/tasks" title="Задачі" desc="Що робити зараз" primary />
-          <NavCard href="/products" title="Каталог товарів" desc="Моделі, фото, ціни" primary />
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Головне</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+          <NavCard href="/orders" title="Замовлення" desc="Список, фото товарів" color="blue" icon="orders" />
+          <NavCard href="/tasks" title="Задачі" desc="Що робити зараз" color="orange" icon="tasks" />
+          <NavCard href="/products" title="Каталог товарів" desc="Моделі, фото, ціни" color="green" icon="catalog" />
         </div>
 
         {/* Другорядні розділи */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
-          <NavCard href="/clients" title="Клієнти" desc="Пошук, додавання" />
-          <NavCard href="/finance" title="Фінанси" desc="Підсумок, прибутки" />
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Ще</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <NavCard href="/clients" title="Клієнти" desc="Пошук, додавання" compact icon="clients" />
+          <NavCard href="/finance" title="Фінанси" desc="Підсумок, прибутки" compact icon="finance" />
           {role === "ADMIN" && (
-            <NavCard href="/admin/users" title="Користувачі" desc="Акаунти, ролі" />
+            <NavCard href="/admin/users" title="Користувачі" desc="Акаунти, ролі" compact icon="users" />
           )}
         </div>
       </main>
@@ -66,41 +77,103 @@ export default async function DashboardPage() {
   );
 }
 
+const colorMap: Record<string, { bg: string; text: string; border: string }> = {
+  blue: { bg: "bg-blue-50", text: "text-blue-600", border: "hover:border-blue-300" },
+  orange: { bg: "bg-orange-50", text: "text-orange-600", border: "hover:border-orange-300" },
+  green: { bg: "bg-green-50", text: "text-green-600", border: "hover:border-green-300" },
+};
+
+function CardIcon({ name, className }: { name: string; className: string }) {
+  const common = { className, fill: "none" as const, stroke: "currentColor" as const, strokeWidth: 1.8, viewBox: "0 0 24 24" };
+  switch (name) {
+    case "orders":
+      return (
+        <svg {...common}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4m0-14v14m9-14v10l-9 4" />
+        </svg>
+      );
+    case "tasks":
+      return (
+        <svg {...common}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+        </svg>
+      );
+    case "catalog":
+      return (
+        <svg {...common}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+      );
+    case "clients":
+      return (
+        <svg {...common}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m5-3.13a4 4 0 100-8 4 4 0 000 8zm6 3.13V16a4 4 0 00-4-4h-4a4 4 0 00-4 4v.13" />
+        </svg>
+      );
+    case "finance":
+      return (
+        <svg {...common}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 10v2m0-14a9 9 0 100 18 9 9 0 000-18z" />
+        </svg>
+      );
+    case "users":
+      return (
+        <svg {...common}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
 function NavCard({
   href,
   title,
   desc,
-  primary,
+  color = "blue",
+  icon,
+  compact,
 }: {
   href: string;
   title: string;
   desc: string;
-  primary?: boolean;
+  color?: string;
+  icon: string;
+  compact?: boolean;
 }) {
-  if (primary) {
+  const c = colorMap[color] ?? colorMap.blue;
+
+  if (compact) {
     return (
       <a
         href={href}
-        className="bg-white rounded-xl border-2 border-blue-100 p-4 hover:border-blue-400 hover:shadow-sm transition flex items-center justify-between group"
+        className="bg-white rounded-lg border border-gray-200 px-3 py-2.5 hover:border-gray-300 hover:shadow-sm transition flex items-center gap-2.5 group active:scale-[0.98]"
       >
-        <div>
-          <p className="font-semibold text-gray-800 group-hover:text-blue-600 transition">{title}</p>
-          <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+        <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0 group-hover:bg-gray-200 transition">
+          <CardIcon name={icon} className="w-4 h-4 text-gray-500" />
         </div>
-        <span className="text-blue-400 group-hover:text-blue-600 transition text-lg">→</span>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-gray-700 truncate">{title}</p>
+          <p className="text-xs text-gray-400 truncate">{desc}</p>
+        </div>
       </a>
     );
   }
+
   return (
     <a
       href={href}
-      className="bg-white rounded-lg border border-gray-200 px-3 py-2 hover:border-gray-300 transition flex items-center justify-between group"
+      className={`bg-white rounded-xl border border-gray-200 p-4 ${c.border} hover:shadow-md transition flex items-center gap-3 group active:scale-[0.98]`}
     >
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-gray-600 group-hover:text-gray-800 transition truncate">{title}</p>
-        <p className="text-xs text-gray-400 truncate">{desc}</p>
+      <div className={`w-11 h-11 rounded-xl ${c.bg} flex items-center justify-center shrink-0`}>
+        <CardIcon name={icon} className={`w-5 h-5 ${c.text}`} />
       </div>
-      <span className="text-gray-300 group-hover:text-gray-500 transition text-sm shrink-0 ml-2">→</span>
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-gray-800 transition">{title}</p>
+        <p className="text-xs text-gray-500 mt-0.5 truncate">{desc}</p>
+      </div>
+      <span className="text-gray-300 group-hover:text-gray-400 transition text-lg shrink-0">→</span>
     </a>
   );
 }
