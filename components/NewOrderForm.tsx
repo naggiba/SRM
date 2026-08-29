@@ -31,6 +31,8 @@ interface ClientOption {
 export default function NewOrderForm({ clients }: { clients: ClientOption[] }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const itemPhotoInputRef = useRef<HTMLInputElement>(null);
+  const [itemPhotoTargetId, setItemPhotoTargetId] = useState<string | null>(null);
 
   const [clientId, setClientId] = useState("");
   const [clientName, setClientName] = useState("");
@@ -105,6 +107,42 @@ export default function NewOrderForm({ clients }: { clients: ClientOption[] }) {
       if (item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
       return prev.filter((it) => it.localId !== localId);
     });
+  }
+
+  function addItemWithoutPhoto() {
+    const draft: ItemDraft = {
+      localId: crypto.randomUUID(),
+      photoPath: "",
+      previewUrl: "",
+      supplier: "",
+      modelNumber: "",
+      price: "",
+      colors: [],
+      uploading: false,
+      uploadError: "",
+    };
+    setItems((prev) => [...prev, draft]);
+  }
+
+  async function handleAddPhotoToItem(localId: string, file: File) {
+    setItems((prev) => prev.map((it) => (it.localId === localId ? { ...it, uploading: true, uploadError: "" } : it)));
+    try {
+      const compressedFile = await compressImage(file);
+      const previewUrl = URL.createObjectURL(compressedFile);
+      const fd = new FormData();
+      fd.append("file", compressedFile);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Помилка завантаження");
+      setItems((prev) =>
+        prev.map((it) =>
+          it.localId === localId ? { ...it, photoPath: data.path, previewUrl, uploading: false } : it
+        )
+      );
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Помилка";
+      setItems((prev) => prev.map((it) => (it.localId === localId ? { ...it, uploading: false, uploadError: msg } : it)));
+    }
   }
 
   // ── Colors ──
@@ -335,22 +373,31 @@ export default function NewOrderForm({ clients }: { clients: ClientOption[] }) {
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="font-semibold text-gray-800 mb-4">Товари (фото + деталі)</h2>
 
-        <div
-          onDrop={handleDrop}
-          onDragOver={(e) => e.preventDefault()}
-          onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-xl p-6 text-center cursor-pointer transition mb-6"
-        >
-          <p className="text-sm text-gray-600">Натисніть або перетягніть фото сюди</p>
-          <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP — до 10 МБ кожне</p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => handleFiles(e.target.files)}
-          />
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <div
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onClick={() => fileInputRef.current?.click()}
+            className="flex-1 border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-xl p-6 text-center cursor-pointer transition"
+          >
+            <p className="text-sm text-gray-600">Натисніть або перетягніть фото сюди</p>
+            <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP — до 10 МБ кожне</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={addItemWithoutPhoto}
+            className="sm:w-48 border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-xl p-6 text-center transition text-sm text-gray-600 hover:text-gray-800"
+          >
+            + Додати без фото
+          </button>
         </div>
 
         {items.length > 0 && (
@@ -367,11 +414,22 @@ export default function NewOrderForm({ clients }: { clients: ClientOption[] }) {
                 </div>
 
                 <div className="flex flex-col md:flex-row">
-                  <div className="md:w-40 h-40 shrink-0 bg-gray-100 relative">
+                  <div
+                    className={`md:w-40 h-40 shrink-0 bg-gray-100 relative ${!item.previewUrl ? "cursor-pointer hover:bg-gray-200 transition" : ""}`}
+                    onClick={() => {
+                      if (!item.previewUrl && !item.uploading) {
+                        setItemPhotoTargetId(item.localId);
+                        itemPhotoInputRef.current?.click();
+                      }
+                    }}
+                  >
                     {item.previewUrl ? (
                       <Image src={item.previewUrl} alt={`Товар ${idx + 1}`} fill className="object-cover" unoptimized />
                     ) : (
-                      <span className="flex items-center justify-center h-full text-gray-400">Немає фото</span>
+                      <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-1">
+                        <span className="text-2xl">📷</span>
+                        <span className="text-xs">Додати фото</span>
+                      </div>
                     )}
                     {item.uploading && (
                       <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
@@ -441,6 +499,19 @@ export default function NewOrderForm({ clients }: { clients: ClientOption[] }) {
             ))}
           </div>
         )}
+
+        <input
+          ref={itemPhotoInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file && itemPhotoTargetId) handleAddPhotoToItem(itemPhotoTargetId, file);
+            e.target.value = "";
+            setItemPhotoTargetId(null);
+          }}
+        />
       </div>
 
       {error && <p className="text-red-500 text-sm bg-red-50 px-4 py-3 rounded-lg">{error}</p>}
