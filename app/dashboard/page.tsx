@@ -2,9 +2,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
-import { db } from "@/lib/db";
-import { clients, orders } from "@/lib/schema";
-import { count, eq } from "drizzle-orm";
 
 const roleLabels: Record<string, string> = {
   ADMIN: "Адміністратор",
@@ -23,16 +20,6 @@ export default async function DashboardPage() {
   if (!session) redirect("/login");
 
   const role = (session.user as { role: string }).role;
-
-  // Паралельні запити
-  const [clientResult, orderResult, sentResult] = await Promise.all([
-    db.select({ value: count() }).from(clients),
-    db.select({ value: count() }).from(orders),
-    db.select({ value: count() }).from(orders).where(eq(orders.status, "SENT_TO_CARGO")),
-  ]);
-  const clientCount = clientResult[0].value;
-  const orderCount = orderResult[0].value;
-  const sentCount = sentResult[0].value;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -59,19 +46,6 @@ export default async function DashboardPage() {
 
       {/* Content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
-        {/* Compact stats */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <a href="/orders" className="block">
-            <StatCard label="Замовлення" value={String(orderCount)} />
-          </a>
-          <a href="/orders" className="block">
-            <StatCard label="Відправлено" value={String(sentCount)} />
-          </a>
-          <a href="/clients" className="block">
-            <StatCard label="Клієнти" value={String(clientCount)} />
-          </a>
-        </div>
-
         {/* Головні розділи */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
           <NavCard href="/orders" title="Замовлення" desc="Список, фото товарів" primary />
@@ -88,15 +62,6 @@ export default async function DashboardPage() {
           )}
         </div>
       </main>
-    </div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 px-3 py-2.5 hover:border-blue-300 transition">
-      <p className="text-xs text-gray-500 leading-tight">{label}</p>
-      <p className="text-xl font-bold text-gray-800 leading-tight mt-0.5">{value}</p>
     </div>
   );
 }
