@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import type { Order, OrderItem, Payment } from "@/lib/schema";
 import { compressImage, formatFileSize } from "@/lib/compress";
+import ProductAutocomplete from "@/components/ProductAutocomplete";
 
 interface ColorQty {
   color: string;
@@ -363,6 +364,24 @@ export default function EditOrderForm({
       return;
     }
 
+    // Зберігаємо товари в каталог (ігноруємо помилки)
+    await Promise.allSettled(
+      items
+        .filter((it) => it.modelNumber.trim())
+        .map((it) =>
+          fetch("/api/products", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              modelNumber: it.modelNumber,
+              supplier: it.supplier,
+              price: it.price,
+              photoPath: it.photoPath || null,
+            }),
+          })
+        )
+    );
+
     router.push("/orders");
     router.refresh();
   }
@@ -713,26 +732,17 @@ export default function EditOrderForm({
                   </div>
 
                   <div className="flex-1 p-4 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <input
-                        value={item.supplier}
-                        onChange={(e) => updateItem(item.localId, "supplier", e.target.value)}
-                        placeholder="Постачальник"
-                        className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm"
-                      />
-                      <input
-                        value={item.modelNumber}
-                        onChange={(e) => updateItem(item.localId, "modelNumber", e.target.value)}
-                        placeholder="Номер моделі"
-                        className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm font-mono"
-                      />
-                      <input
-                        value={item.price}
-                        onChange={(e) => updateItem(item.localId, "price", e.target.value)}
-                        placeholder="Ціна"
-                        className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm"
-                      />
-                    </div>
+                    <ProductAutocomplete
+                      modelNumber={item.modelNumber}
+                      supplier={item.supplier}
+                      price={item.price}
+                      onSelect={(data) => {
+                        updateItem(item.localId, "modelNumber", data.modelNumber);
+                        updateItem(item.localId, "supplier", data.supplier);
+                        updateItem(item.localId, "price", data.price);
+                      }}
+                      onChange={(field, value) => updateItem(item.localId, field, value)}
+                    />
 
                     {/* Colors with quantity */}
                     <div>

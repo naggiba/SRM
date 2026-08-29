@@ -82,6 +82,19 @@ if (useTurso) {
           created_at TEXT NOT NULL
         )
       `);
+
+      await client.execute(`
+        CREATE TABLE IF NOT EXISTS products (
+          id TEXT PRIMARY KEY,
+          model_number TEXT NOT NULL UNIQUE,
+          photo_path TEXT,
+          supplier TEXT,
+          price TEXT,
+          note TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `);
     } catch (e) {
       console.error("DB init error:", e);
     }
@@ -164,6 +177,19 @@ if (useTurso) {
       photo_path TEXT,
       note TEXT,
       created_at TEXT NOT NULL
+    )
+  `);
+
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY,
+      model_number TEXT NOT NULL UNIQUE,
+      photo_path TEXT,
+      supplier TEXT,
+      price TEXT,
+      note TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     )
   `);
 }

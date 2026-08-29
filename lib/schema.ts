@@ -76,6 +76,22 @@ export type Order = typeof orders.$inferSelect;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 
+// ── Products (каталог товарів) ───────────────────────────────────────────────
+
+export const products = sqliteTable("products", {
+  id: text("id").primaryKey(),
+  modelNumber: text("model_number").notNull().unique(), // унікальний номер моделі
+  photoPath: text("photo_path"),
+  supplier: text("supplier"),
+  price: text("price"),
+  note: text("note"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export type Product = typeof products.$inferSelect;
+export type NewProduct = typeof products.$inferInsert;
+
 // Типи для кольорів
 export interface ColorQty {
   color: string;
