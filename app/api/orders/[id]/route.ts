@@ -15,12 +15,17 @@ export async function GET(
   if (!session) return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
 
   const { id } = await params;
-  const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
-  if (!order) return NextResponse.json({ error: "Не знайдено" }, { status: 404 });
 
-  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id)).orderBy(orderItems.sortOrder);
-  const orderPayments = await db.select().from(payments).where(eq(payments.orderId, id)).orderBy(payments.createdAt);
-  const expenses = await db.select().from(extraExpenses).where(eq(extraExpenses.orderId, id)).orderBy(extraExpenses.createdAt);
+  // Паралельні запити
+  const [orderResult, items, orderPayments, expenses] = await Promise.all([
+    db.select().from(orders).where(eq(orders.id, id)).limit(1),
+    db.select().from(orderItems).where(eq(orderItems.orderId, id)).orderBy(orderItems.sortOrder),
+    db.select().from(payments).where(eq(payments.orderId, id)).orderBy(payments.createdAt),
+    db.select().from(extraExpenses).where(eq(extraExpenses.orderId, id)).orderBy(extraExpenses.createdAt),
+  ]);
+
+  const order = orderResult[0];
+  if (!order) return NextResponse.json({ error: "Не знайдено" }, { status: 404 });
 
   return NextResponse.json({ ...order, items, payments: orderPayments, expenses });
 }
@@ -110,12 +115,14 @@ export async function PATCH(
     }).where(eq(orders.id, id));
   }
 
-  const [updated] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
-  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id)).orderBy(orderItems.sortOrder);
-  const orderPayments = await db.select().from(payments).where(eq(payments.orderId, id)).orderBy(payments.createdAt);
-  const expenses = await db.select().from(extraExpenses).where(eq(extraExpenses.orderId, id)).orderBy(extraExpenses.createdAt);
+  const [updatedResult, updatedItems, updatedPayments, updatedExpenses] = await Promise.all([
+    db.select().from(orders).where(eq(orders.id, id)).limit(1),
+    db.select().from(orderItems).where(eq(orderItems.orderId, id)).orderBy(orderItems.sortOrder),
+    db.select().from(payments).where(eq(payments.orderId, id)).orderBy(payments.createdAt),
+    db.select().from(extraExpenses).where(eq(extraExpenses.orderId, id)).orderBy(extraExpenses.createdAt),
+  ]);
 
-  return NextResponse.json({ ...updated, items, payments: orderPayments, expenses });
+  return NextResponse.json({ ...updatedResult[0], items: updatedItems, payments: updatedPayments, expenses: updatedExpenses });
 }
 
 // DELETE /api/orders/[id] (admin only)

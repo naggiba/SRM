@@ -12,9 +12,12 @@ export default async function OrdersPage() {
 
   const role = (session.user as { role: string }).role;
 
-  const allOrders: Order[] = await db.select().from(orders).orderBy(desc(orders.createdAt));
-  const allItems: OrderItem[] = await db.select().from(orderItems);
-  const allPayments: Payment[] = await db.select().from(payments);
+  // Паралельні запити
+  const [allOrders, allItems, allPayments] = await Promise.all([
+    db.select().from(orders).orderBy(desc(orders.createdAt)) as Promise<Order[]>,
+    db.select().from(orderItems) as Promise<OrderItem[]>,
+    db.select().from(payments) as Promise<Payment[]>,
+  ]);
 
   const data = allOrders.map((o: Order) => ({
     ...o,

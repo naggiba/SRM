@@ -18,31 +18,18 @@ export default async function EditOrderPage({
   if (role === "VIEWER") redirect("/orders");
 
   const { id } = await params;
-  const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+
+  // Всі запити паралельно — замість 5 послідовних
+  const [orderResult, items, orderPayments, orderExpenses, allClients] = await Promise.all([
+    db.select().from(orders).where(eq(orders.id, id)).limit(1),
+    db.select().from(orderItems).where(eq(orderItems.orderId, id)).orderBy(orderItems.sortOrder),
+    db.select().from(payments).where(eq(payments.orderId, id)).orderBy(payments.createdAt),
+    db.select().from(extraExpenses).where(eq(extraExpenses.orderId, id)).orderBy(extraExpenses.createdAt),
+    db.select({ id: clients.id, name: clients.name }).from(clients).orderBy(clients.name),
+  ]);
+
+  const order = orderResult[0];
   if (!order) notFound();
-
-  const items = await db
-    .select()
-    .from(orderItems)
-    .where(eq(orderItems.orderId, id))
-    .orderBy(orderItems.sortOrder);
-
-  const orderPayments = await db
-    .select()
-    .from(payments)
-    .where(eq(payments.orderId, id))
-    .orderBy(payments.createdAt);
-
-  const orderExpenses = await db
-    .select()
-    .from(extraExpenses)
-    .where(eq(extraExpenses.orderId, id))
-    .orderBy(extraExpenses.createdAt);
-
-  const allClients = await db
-    .select({ id: clients.id, name: clients.name })
-    .from(clients)
-    .orderBy(clients.name);
 
   return (
     <div className="min-h-screen bg-gray-50">

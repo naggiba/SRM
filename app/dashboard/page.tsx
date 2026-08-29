@@ -23,9 +23,16 @@ export default async function DashboardPage() {
   if (!session) redirect("/login");
 
   const role = (session.user as { role: string }).role;
-  const [{ value: clientCount }] = await db.select({ value: count() }).from(clients);
-  const [{ value: orderCount }] = await db.select({ value: count() }).from(orders);
-  const [{ value: sentCount }] = await db.select({ value: count() }).from(orders).where(eq(orders.status, "SENT_TO_CARGO"));
+
+  // Паралельні запити
+  const [clientResult, orderResult, sentResult] = await Promise.all([
+    db.select({ value: count() }).from(clients),
+    db.select({ value: count() }).from(orders),
+    db.select({ value: count() }).from(orders).where(eq(orders.status, "SENT_TO_CARGO")),
+  ]);
+  const clientCount = clientResult[0].value;
+  const orderCount = orderResult[0].value;
+  const sentCount = sentResult[0].value;
 
   return (
     <div className="min-h-screen bg-gray-50">

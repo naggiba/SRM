@@ -8,232 +8,38 @@ let db: ReturnType<typeof drizzle>;
 
 if (useTurso) {
   // Turso (Vercel / продакшен)
+  // Таблиці вже створені через seed-turso.ts — initDb не потрібен
   const client = createClient({
     url: process.env.TURSO_DATABASE_URL!,
     authToken: process.env.TURSO_AUTH_TOKEN!,
   });
-  
   db = drizzle(client, { schema });
-
-  // Ініціалізація таблиць
-  (async () => {
-    try {
-      await client.execute(`
-        CREATE TABLE IF NOT EXISTS users (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          email TEXT NOT NULL UNIQUE,
-          password TEXT NOT NULL,
-          role TEXT NOT NULL DEFAULT 'VIEWER',
-          created_at TEXT NOT NULL
-        )
-      `);
-
-      await client.execute(`
-        CREATE TABLE IF NOT EXISTS clients (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          telegram TEXT,
-          cargo_code TEXT,
-          created_at TEXT NOT NULL
-        )
-      `);
-
-      await client.execute(`
-        CREATE TABLE IF NOT EXISTS orders (
-          id TEXT PRIMARY KEY,
-          client_id TEXT,
-          client_name TEXT,
-          note TEXT,
-          total_price TEXT,
-          client_paid TEXT,
-          we_paid TEXT,
-          delivery_type TEXT,
-          estimated_ship_date TEXT,
-          order_date TEXT,
-          cargo_photo_path TEXT,
-          status TEXT NOT NULL DEFAULT 'NEW',
-          created_at TEXT NOT NULL,
-          created_by TEXT NOT NULL
-        )
-      `);
-
-      await client.execute(`
-        CREATE TABLE IF NOT EXISTS order_items (
-          id TEXT PRIMARY KEY,
-          order_id TEXT NOT NULL,
-          photo_path TEXT,
-          supplier TEXT,
-          model_number TEXT,
-          price TEXT,
-          colors TEXT,
-          sort_order INTEGER NOT NULL DEFAULT 0
-        )
-      `);
-
-      await client.execute(`
-        CREATE TABLE IF NOT EXISTS payments (
-          id TEXT PRIMARY KEY,
-          order_id TEXT NOT NULL,
-          type TEXT NOT NULL,
-          amount TEXT NOT NULL,
-          currency TEXT NOT NULL DEFAULT 'CNY',
-          exchange_rate TEXT,
-          photo_path TEXT,
-          note TEXT,
-          created_at TEXT NOT NULL
-        )
-      `);
-
-      // Migration: add currency/exchange_rate to payments if missing
-      try {
-        await client.execute("ALTER TABLE payments ADD COLUMN currency TEXT NOT NULL DEFAULT 'CNY'");
-      } catch { /* вже існує */ }
-      try {
-        await client.execute("ALTER TABLE payments ADD COLUMN exchange_rate TEXT");
-      } catch { /* вже існує */ }
-
-      await client.execute(`
-        CREATE TABLE IF NOT EXISTS extra_expenses (
-          id TEXT PRIMARY KEY,
-          order_id TEXT NOT NULL,
-          description TEXT NOT NULL,
-          amount TEXT NOT NULL,
-          created_at TEXT NOT NULL
-        )
-      `);
-
-      await client.execute(`
-        CREATE TABLE IF NOT EXISTS products (
-          id TEXT PRIMARY KEY,
-          model_number TEXT NOT NULL UNIQUE,
-          photo_path TEXT,
-          supplier TEXT,
-          price TEXT,
-          note TEXT,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        )
-      `);
-    } catch (e) {
-      console.error("DB init error:", e);
-    }
-  })();
 } else {
   // Локальна SQLite (розробка)
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  /* eslint-disable @typescript-eslint/no-require-imports */
   const Database = require("better-sqlite3");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { drizzle: drizzleSqlite } = require("drizzle-orm/better-sqlite3");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require("path");
+  /* eslint-enable @typescript-eslint/no-require-imports */
 
   const dbPath = path.join(process.cwd(), "crm.db");
   const sqlite = new Database(dbPath);
   sqlite.pragma("journal_mode = WAL");
-
   db = drizzleSqlite(sqlite, { schema });
 
-  // Створення таблиць локально
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      email TEXT NOT NULL UNIQUE,
-      password TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'VIEWER',
-      created_at TEXT NOT NULL
-    )
-  `);
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'VIEWER', created_at TEXT NOT NULL)`);
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS clients (id TEXT PRIMARY KEY, name TEXT NOT NULL, telegram TEXT, cargo_code TEXT, created_at TEXT NOT NULL)`);
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, client_id TEXT, client_name TEXT, note TEXT, total_price TEXT, client_paid TEXT, we_paid TEXT, delivery_type TEXT, estimated_ship_date TEXT, order_date TEXT, cargo_photo_path TEXT, status TEXT NOT NULL DEFAULT 'NEW', created_at TEXT NOT NULL, created_by TEXT NOT NULL)`);
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS order_items (id TEXT PRIMARY KEY, order_id TEXT NOT NULL, photo_path TEXT, supplier TEXT, model_number TEXT, price TEXT, colors TEXT, sort_order INTEGER NOT NULL DEFAULT 0)`);
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, order_id TEXT NOT NULL, type TEXT NOT NULL, amount TEXT NOT NULL, currency TEXT NOT NULL DEFAULT 'CNY', exchange_rate TEXT, photo_path TEXT, note TEXT, created_at TEXT NOT NULL)`);
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS extra_expenses (id TEXT PRIMARY KEY, order_id TEXT NOT NULL, description TEXT NOT NULL, amount TEXT NOT NULL, created_at TEXT NOT NULL)`);
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, model_number TEXT NOT NULL UNIQUE, photo_path TEXT, supplier TEXT, price TEXT, note TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
 
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS clients (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      telegram TEXT,
-      cargo_code TEXT,
-      created_at TEXT NOT NULL
-    )
-  `);
-
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS orders (
-      id TEXT PRIMARY KEY,
-      client_id TEXT,
-      client_name TEXT,
-      note TEXT,
-      total_price TEXT,
-      client_paid TEXT,
-      we_paid TEXT,
-      delivery_type TEXT,
-      estimated_ship_date TEXT,
-      order_date TEXT,
-      cargo_photo_path TEXT,
-      status TEXT NOT NULL DEFAULT 'NEW',
-      created_at TEXT NOT NULL,
-      created_by TEXT NOT NULL
-    )
-  `);
-
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS order_items (
-      id TEXT PRIMARY KEY,
-      order_id TEXT NOT NULL,
-      photo_path TEXT,
-      supplier TEXT,
-      model_number TEXT,
-      price TEXT,
-      colors TEXT,
-      sort_order INTEGER NOT NULL DEFAULT 0
-    )
-  `);
-
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS payments (
-      id TEXT PRIMARY KEY,
-      order_id TEXT NOT NULL,
-      type TEXT NOT NULL,
-      amount TEXT NOT NULL,
-      currency TEXT NOT NULL DEFAULT 'CNY',
-      exchange_rate TEXT,
-      photo_path TEXT,
-      note TEXT,
-      created_at TEXT NOT NULL
-    )
-  `);
-
-  // Migration: add currency/exchange_rate to payments if missing
+  // Migrations
   const paymentCols = sqlite.prepare("PRAGMA table_info(payments)").all() as { name: string }[];
   const paymentColNames = paymentCols.map((c: { name: string }) => c.name);
-  if (!paymentColNames.includes("currency")) {
-    sqlite.exec("ALTER TABLE payments ADD COLUMN currency TEXT NOT NULL DEFAULT 'CNY'");
-  }
-  if (!paymentColNames.includes("exchange_rate")) {
-    sqlite.exec("ALTER TABLE payments ADD COLUMN exchange_rate TEXT");
-  }
-
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS extra_expenses (
-      id TEXT PRIMARY KEY,
-      order_id TEXT NOT NULL,
-      description TEXT NOT NULL,
-      amount TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    )
-  `);
-
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS products (
-      id TEXT PRIMARY KEY,
-      model_number TEXT NOT NULL UNIQUE,
-      photo_path TEXT,
-      supplier TEXT,
-      price TEXT,
-      note TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-  `);
+  if (!paymentColNames.includes("currency")) sqlite.exec("ALTER TABLE payments ADD COLUMN currency TEXT NOT NULL DEFAULT 'CNY'");
+  if (!paymentColNames.includes("exchange_rate")) sqlite.exec("ALTER TABLE payments ADD COLUMN exchange_rate TEXT");
 }
 
 export { db };

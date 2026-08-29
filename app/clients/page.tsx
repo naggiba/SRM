@@ -11,9 +11,13 @@ export default async function ClientsPage() {
   if (!session) redirect("/login");
 
   const role = (session.user as { role: string }).role;
-  const allClients = await db.select().from(clients).orderBy(clients.createdAt);
-  const allOrders = await db.select().from(orders).orderBy(desc(orders.createdAt));
-  const allUsers = await db.select({ id: users.id, name: users.name }).from(users);
+
+  // Паралельні запити
+  const [allClients, allOrders, allUsers] = await Promise.all([
+    db.select().from(clients).orderBy(clients.createdAt),
+    db.select().from(orders).orderBy(desc(orders.createdAt)),
+    db.select({ id: users.id, name: users.name }).from(users),
+  ]);
 
   // Групуємо замовлення по clientId та clientName
   const ordersByClient: Record<string, typeof allOrders> = {};
