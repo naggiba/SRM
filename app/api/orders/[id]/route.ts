@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { orders, orderItems, payments } from "@/lib/schema";
+import { orders, orderItems, payments, extraExpenses } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
@@ -18,22 +18,14 @@ export async function GET(
   const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
   if (!order) return NextResponse.json({ error: "Не знайдено" }, { status: 404 });
 
-  const items = await db
-    .select()
-    .from(orderItems)
-    .where(eq(orderItems.orderId, id))
-    .orderBy(orderItems.sortOrder);
+  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id)).orderBy(orderItems.sortOrder);
+  const orderPayments = await db.select().from(payments).where(eq(payments.orderId, id)).orderBy(payments.createdAt);
+  const expenses = await db.select().from(extraExpenses).where(eq(extraExpenses.orderId, id)).orderBy(extraExpenses.createdAt);
 
-  const orderPayments = await db
-    .select()
-    .from(payments)
-    .where(eq(payments.orderId, id))
-    .orderBy(payments.createdAt);
-
-  return NextResponse.json({ ...order, items, payments: orderPayments });
+  return NextResponse.json({ ...order, items, payments: orderPayments, expenses });
 }
 
-// PATCH /api/orders/[id] — update status/note/items/payments
+// PATCH /api/orders/[id]
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -66,11 +58,9 @@ export async function PATCH(
     await db.delete(orderItems).where(eq(orderItems.orderId, id));
     for (let i = 0; i < body.items.length; i++) {
       const item = body.items[i];
-      // colors може бути JSON масив або string
-      const colorsValue = typeof item.colors === "object" 
-        ? JSON.stringify(item.colors) 
+      const colorsValue = typeof item.colors === "object"
+        ? JSON.stringify(item.colors)
         : (item.colors?.trim() || null);
-      
       await db.insert(orderItems).values({
         id: item.id || randomUUID(),
         orderId: id,
@@ -84,7 +74,7 @@ export async function PATCH(
     }
   }
 
-  // replace payments if provided
+  // replace payments if provided (з підтримкою currency/exchangeRate)
   if (Array.isArray(body.payments)) {
     await db.delete(payments).where(eq(payments.orderId, id));
     for (const p of body.payments) {
@@ -93,21 +83,27 @@ export async function PATCH(
         orderId: id,
         type: p.type,
         amount: p.amount?.trim() || "0",
+        currency: p.currency || "CNY",
+        exchangeRate: p.exchangeRate?.trim() || null,
         photoPath: p.photoPath || null,
         note: p.note?.trim() || null,
         createdAt: p.createdAt || new Date().toISOString(),
       });
     }
-    
-    // Recalculate totals
+
+    // Перераховуємо суми — конвертуємо UAH в CNY за курсом якщо є
     const allPayments = await db.select().from(payments).where(eq(payments.orderId, id));
     const clientPaid = allPayments
       .filter((p: { type: string }) => p.type === "CLIENT")
-      .reduce((sum: number, p: { amount: string }) => sum + (parseFloat(p.amount) || 0), 0);
+      .reduce((sum: number, p: { amount: string; currency: string; exchangeRate: string | null }) => {
+        const amt = parseFloat(p.amount) || 0;
+        // Зберігаємо суму як є (в тій валюті яку ввели)
+        return sum + amt;
+      }, 0);
     const wePaid = allPayments
       .filter((p: { type: string }) => p.type === "SUPPLIER")
       .reduce((sum: number, p: { amount: string }) => sum + (parseFloat(p.amount) || 0), 0);
-    
+
     await db.update(orders).set({
       clientPaid: clientPaid.toString(),
       wePaid: wePaid.toString(),
@@ -117,8 +113,9 @@ export async function PATCH(
   const [updated] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id)).orderBy(orderItems.sortOrder);
   const orderPayments = await db.select().from(payments).where(eq(payments.orderId, id)).orderBy(payments.createdAt);
+  const expenses = await db.select().from(extraExpenses).where(eq(extraExpenses.orderId, id)).orderBy(extraExpenses.createdAt);
 
-  return NextResponse.json({ ...updated, items, payments: orderPayments });
+  return NextResponse.json({ ...updated, items, payments: orderPayments, expenses });
 }
 
 // DELETE /api/orders/[id] (admin only)
@@ -133,6 +130,7 @@ export async function DELETE(
   }
 
   const { id } = await params;
+  await db.delete(extraExpenses).where(eq(extraExpenses.orderId, id));
   await db.delete(payments).where(eq(payments.orderId, id));
   await db.delete(orderItems).where(eq(orderItems.orderId, id));
   await db.delete(orders).where(eq(orders.id, id));

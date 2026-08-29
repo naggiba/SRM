@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { orders, orderItems, clients, payments } from "@/lib/schema";
+import { orders, orderItems, clients, payments, extraExpenses } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import EditOrderForm from "@/components/EditOrderForm";
 
@@ -33,6 +33,12 @@ export default async function EditOrderPage({
     .where(eq(payments.orderId, id))
     .orderBy(payments.createdAt);
 
+  const orderExpenses = await db
+    .select()
+    .from(extraExpenses)
+    .where(eq(extraExpenses.orderId, id))
+    .orderBy(extraExpenses.createdAt);
+
   const allClients = await db
     .select({ id: clients.id, name: clients.name })
     .from(clients)
@@ -51,7 +57,13 @@ export default async function EditOrderPage({
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-10">
-        <EditOrderForm order={order} items={items} payments={orderPayments} clients={allClients} />
+        <EditOrderForm
+          order={order}
+          items={items}
+          payments={orderPayments}
+          expenses={orderExpenses}
+          clients={allClients}
+        />
       </main>
     </div>
   );

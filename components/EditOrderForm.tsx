@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import type { Order, OrderItem, Payment } from "@/lib/schema";
+import type { Order, OrderItem, Payment, ExtraExpense } from "@/lib/schema";
 import { compressImage, formatFileSize } from "@/lib/compress";
 import ProductAutocomplete from "@/components/ProductAutocomplete";
 
@@ -30,6 +30,8 @@ interface PaymentDraft {
   serverId?: string;
   type: "CLIENT" | "SUPPLIER";
   amount: string;
+  currency: "CNY" | "UAH";
+  exchangeRate: string;
   photoPath: string;
   previewUrl: string;
   note: string;
@@ -76,11 +78,13 @@ export default function EditOrderForm({
   order,
   items: serverItems,
   payments: serverPayments,
+  expenses: serverExpenses,
   clients,
 }: {
   order: Order;
   items: OrderItem[];
   payments: Payment[];
+  expenses: ExtraExpense[];
   clients: ClientOption[];
 }) {
   const router = useRouter();
@@ -120,6 +124,8 @@ export default function EditOrderForm({
       serverId: sp.id,
       type: sp.type as "CLIENT" | "SUPPLIER",
       amount: sp.amount ?? "",
+      currency: (sp.currency ?? "CNY") as "CNY" | "UAH",
+      exchangeRate: sp.exchangeRate ?? "",
       photoPath: sp.photoPath ?? "",
       previewUrl: sp.photoPath ?? "",
       note: sp.note ?? "",
@@ -127,6 +133,11 @@ export default function EditOrderForm({
       createdAt: sp.createdAt,
     }))
   );
+
+  const [expensesState, setExpensesState] = useState<ExtraExpense[]>(serverExpenses ?? []);
+  const [newExpenseDesc, setNewExpenseDesc] = useState("");
+  const [newExpenseAmount, setNewExpenseAmount] = useState("");
+  const [addingExpense, setAddingExpense] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -237,6 +248,8 @@ export default function EditOrderForm({
       localId: crypto.randomUUID(),
       type,
       amount: "",
+      currency: "CNY",
+      exchangeRate: "",
       photoPath: "",
       previewUrl: URL.createObjectURL(originalFile),
       note: "",
@@ -272,6 +285,8 @@ export default function EditOrderForm({
       localId: crypto.randomUUID(),
       type,
       amount: "",
+      currency: "CNY",
+      exchangeRate: "",
       photoPath: "",
       previewUrl: "",
       note: "",
@@ -347,9 +362,11 @@ export default function EditOrderForm({
           price,
           colors,
         })),
-        payments: paymentsState.map(({ type, amount, photoPath, note, createdAt }) => ({
+        payments: paymentsState.map(({ type, amount, currency, exchangeRate, photoPath, note, createdAt }) => ({
           type,
           amount,
+          currency,
+          exchangeRate: exchangeRate || null,
           photoPath,
           note,
           createdAt,
@@ -393,13 +410,39 @@ export default function EditOrderForm({
 
   // ── Payment calculations ──
   const total = parseFloat(totalPrice) || 0;
-  const clientPaidTotal = paymentsState
+
+  // Клієнт: конвертуємо UAH → CNY якщо є курс
+  const clientPaidTotalCNY = paymentsState
     .filter((p) => p.type === "CLIENT")
-    .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    .reduce((sum, p) => {
+      const amt = parseFloat(p.amount) || 0;
+      if (p.currency === "UAH" && p.exchangeRate) {
+        return sum + (amt / (parseFloat(p.exchangeRate) || 1));
+      }
+      return sum + amt;
+    }, 0);
+
+  // Клієнт в UAH (для відображення надходжень)
+  const clientPaidTotalUAH = paymentsState
+    .filter((p) => p.type === "CLIENT")
+    .reduce((sum, p) => {
+      const amt = parseFloat(p.amount) || 0;
+      if (p.currency === "UAH") return sum + amt;
+      return sum; // CNY не рахуємо в UAH
+    }, 0);
+
+  const clientPaidTotal = clientPaidTotalCNY;
+
   const wePaidTotal = paymentsState
     .filter((p) => p.type === "SUPPLIER")
     .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+  const totalExpenses = expensesState
+    .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
   const debtFromClient = total - clientPaidTotal;
+  // Заробіток = те що заплатив клієнт (в CNY) - те що ми заплатили постачальнику
+  const profit = clientPaidTotal - wePaidTotal;
 
   // ── Auto-calculate total from items ──
   const calculatedTotal = items.reduce((sum, item) => {
@@ -482,33 +525,80 @@ export default function EditOrderForm({
         {/* Payment list */}
         <div className="space-y-3">
           {(activePaymentType === "CLIENT" ? clientPayments : supplierPayments).map((p) => (
-            <div key={p.localId} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
-              {p.previewUrl && (
-                <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 shrink-0 relative">
-                  <Image src={p.previewUrl} alt="чек" fill className="object-cover" unoptimized />
+            <div key={p.localId} className="p-3 bg-gray-50 rounded-lg space-y-2">
+              <div className="flex gap-3">
+                {p.previewUrl && (
+                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 shrink-0 relative">
+                    <Image src={p.previewUrl} alt="чек" fill className="object-cover" unoptimized />
+                  </div>
+                )}
+                <div className="flex-1 grid grid-cols-2 gap-2">
+                  <input
+                    value={p.amount}
+                    onChange={(e) => updatePayment(p.localId, "amount", e.target.value)}
+                    placeholder="Сума"
+                    className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                  <input
+                    value={p.note}
+                    onChange={(e) => updatePayment(p.localId, "note", e.target.value)}
+                    placeholder="Примітка"
+                    className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removePayment(p.localId)}
+                  className="text-red-500 hover:text-red-700 text-sm px-2"
+                >
+                  ✕
+                </button>
+              </div>
+              {/* Валюта — тільки для CLIENT */}
+              {p.type === "CLIENT" && (
+                <div className="flex items-center gap-3 pl-1">
+                  <span className="text-xs text-gray-500">Валюта:</span>
+                  <label className="flex items-center gap-1 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`currency-${p.localId}`}
+                      value="CNY"
+                      checked={p.currency === "CNY"}
+                      onChange={() => updatePayment(p.localId, "currency", "CNY")}
+                      className="accent-blue-600"
+                    />
+                    <span className="text-gray-700">¥ Юань</span>
+                  </label>
+                  <label className="flex items-center gap-1 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`currency-${p.localId}`}
+                      value="UAH"
+                      checked={p.currency === "UAH"}
+                      onChange={() => updatePayment(p.localId, "currency", "UAH")}
+                      className="accent-blue-600"
+                    />
+                    <span className="text-gray-700">₴ Гривня</span>
+                  </label>
+                  {p.currency === "UAH" && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500">Курс:</span>
+                      <input
+                        value={p.exchangeRate}
+                        onChange={(e) => updatePayment(p.localId, "exchangeRate", e.target.value)}
+                        placeholder="4.2"
+                        className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                      />
+                      <span className="text-xs text-gray-400">грн/¥</span>
+                      {p.amount && p.exchangeRate && (
+                        <span className="text-xs text-blue-600 ml-1">
+                          = {(parseFloat(p.amount) / parseFloat(p.exchangeRate) || 0).toFixed(2)} ¥
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
-              <div className="flex-1 grid grid-cols-2 gap-2">
-                <input
-                  value={p.amount}
-                  onChange={(e) => updatePayment(p.localId, "amount", e.target.value)}
-                  placeholder="Сума"
-                  className="px-2 py-1.5 border border-gray-300 rounded text-sm"
-                />
-                <input
-                  value={p.note}
-                  onChange={(e) => updatePayment(p.localId, "note", e.target.value)}
-                  placeholder="Примітка"
-                  className="px-2 py-1.5 border border-gray-300 rounded text-sm"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => removePayment(p.localId)}
-                className="text-red-500 hover:text-red-700 text-sm px-2"
-              >
-                ✕
-              </button>
             </div>
           ))}
         </div>
@@ -543,6 +633,129 @@ export default function EditOrderForm({
             }}
           />
         </div>
+      </div>
+
+      {/* ── Додаткові витрати ── */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <h2 className="font-semibold text-gray-800">Додаткові витрати</h2>
+
+        {/* Список витрат */}
+        {expensesState.length > 0 ? (
+          <div className="space-y-2">
+            {expensesState.map((e) => (
+              <div key={e.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-800">{e.description}</span>
+                  <span className="text-sm font-semibold text-orange-700">{e.amount} ₴</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await fetch(`/api/orders/${order.id}/expenses`, {
+                      method: "DELETE",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ expenseId: e.id }),
+                    });
+                    setExpensesState((prev) => prev.filter((x) => x.id !== e.id));
+                  }}
+                  className="text-red-400 hover:text-red-600 text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <div className="text-sm font-semibold text-orange-700 text-right pt-1">
+              Всього витрат: {totalExpenses.toFixed(2)} ₴
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">Додаткових витрат немає</p>
+        )}
+
+        {/* Форма додавання */}
+        <div className="flex gap-2 items-end">
+          <div className="flex-1">
+            <label className="block text-xs text-gray-500 mb-1">Назва витрати</label>
+            <input
+              value={newExpenseDesc}
+              onChange={(e) => setNewExpenseDesc(e.target.value)}
+              placeholder="Доставка, митниця, упаковка..."
+              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm"
+            />
+          </div>
+          <div className="w-32">
+            <label className="block text-xs text-gray-500 mb-1">Сума (₴)</label>
+            <input
+              value={newExpenseAmount}
+              onChange={(e) => setNewExpenseAmount(e.target.value)}
+              placeholder="0.00"
+              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm"
+            />
+          </div>
+          <button
+            type="button"
+            disabled={addingExpense || !newExpenseDesc.trim() || !newExpenseAmount.trim()}
+            onClick={async () => {
+              setAddingExpense(true);
+              const res = await fetch(`/api/orders/${order.id}/expenses`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ description: newExpenseDesc, amount: newExpenseAmount }),
+              });
+              if (res.ok) {
+                const created = await res.json();
+                setExpensesState((prev) => [...prev, created]);
+                setNewExpenseDesc("");
+                setNewExpenseAmount("");
+              }
+              setAddingExpense(false);
+            }}
+            className="px-3 py-1.5 bg-orange-100 text-orange-700 hover:bg-orange-200 rounded-lg text-sm font-medium transition disabled:opacity-50"
+          >
+            + Додати
+          </button>
+        </div>
+      </div>
+
+      {/* ── Фінансовий підсумок ── */}
+      <div className="bg-white rounded-xl border border-blue-200 p-6 space-y-4">
+        <h2 className="font-semibold text-gray-800">Фінансовий підсумок</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-blue-50 rounded-xl p-4">
+            <p className="text-xs text-blue-500 mb-1">Вартість замовлення</p>
+            <p className="text-2xl font-bold text-blue-700">{total.toFixed(2)} ¥</p>
+          </div>
+          <div className="bg-green-50 rounded-xl p-4">
+            <p className="text-xs text-green-500 mb-1">Надходження від клієнта</p>
+            <p className="text-2xl font-bold text-green-700">{clientPaidTotalCNY.toFixed(2)} ¥</p>
+            {clientPaidTotalUAH > 0 && (
+              <p className="text-xs text-green-400 mt-0.5">+ {clientPaidTotalUAH.toFixed(0)} ₴</p>
+            )}
+          </div>
+          <div className="bg-orange-50 rounded-xl p-4">
+            <p className="text-xs text-orange-500 mb-1">Ми витратили</p>
+            <p className="text-2xl font-bold text-orange-700">{wePaidTotal.toFixed(2)} ¥</p>
+            {totalExpenses > 0 && (
+              <p className="text-xs text-orange-400 mt-0.5">+ {totalExpenses.toFixed(0)} ₴ витрат</p>
+            )}
+          </div>
+          <div className={`rounded-xl p-4 ${profit >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
+            <p className={`text-xs mb-1 ${profit >= 0 ? "text-emerald-500" : "text-red-500"}`}>Заробіток</p>
+            <p className={`text-2xl font-bold ${profit >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+              {profit >= 0 ? "+" : ""}{profit.toFixed(2)} ¥
+            </p>
+          </div>
+        </div>
+        {debtFromClient > 0 && (
+          <div className="bg-red-50 text-red-700 text-sm px-4 py-2 rounded-lg">
+            Борг клієнта: {debtFromClient.toFixed(2)} ¥
+          </div>
+        )}
+        {debtFromClient < 0 && (
+          <div className="bg-green-50 text-green-700 text-sm px-4 py-2 rounded-lg">
+            Переплата клієнта: {Math.abs(debtFromClient).toFixed(2)} ¥
+          </div>
+        )}
       </div>
 
       {/* ── Клієнт + статус + примітка ── */}

@@ -65,9 +65,11 @@ export const orderItems = sqliteTable("order_items", {
 export const payments = sqliteTable("payments", {
   id: text("id").primaryKey(),
   orderId: text("order_id").notNull(),
-  type: text("type", { enum: ["CLIENT", "SUPPLIER"] }).notNull(), // CLIENT = від клієнта, SUPPLIER = постачальнику
+  type: text("type", { enum: ["CLIENT", "SUPPLIER"] }).notNull(),
   amount: text("amount").notNull(),
-  photoPath: text("photo_path"),        // фото чеку/підтвердження
+  currency: text("currency", { enum: ["CNY", "UAH"] }).notNull().default("CNY"),
+  exchangeRate: text("exchange_rate"),   // курс грн/юань якщо currency=UAH
+  photoPath: text("photo_path"),
   note: text("note"),
   createdAt: text("created_at").notNull(),
 });
@@ -75,6 +77,18 @@ export const payments = sqliteTable("payments", {
 export type Order = typeof orders.$inferSelect;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
+
+// ── Extra Expenses (додаткові витрати) ───────────────────────────────────────
+
+export const extraExpenses = sqliteTable("extra_expenses", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id").notNull(),
+  description: text("description").notNull(),  // назва витрати
+  amount: text("amount").notNull(),             // сума в грн
+  createdAt: text("created_at").notNull(),
+});
+
+export type ExtraExpense = typeof extraExpenses.$inferSelect;
 
 // ── Products (каталог товарів) ───────────────────────────────────────────────
 

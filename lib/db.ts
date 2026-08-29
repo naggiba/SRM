@@ -77,8 +77,28 @@ if (useTurso) {
           order_id TEXT NOT NULL,
           type TEXT NOT NULL,
           amount TEXT NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'CNY',
+          exchange_rate TEXT,
           photo_path TEXT,
           note TEXT,
+          created_at TEXT NOT NULL
+        )
+      `);
+
+      // Migration: add currency/exchange_rate to payments if missing
+      try {
+        await client.execute("ALTER TABLE payments ADD COLUMN currency TEXT NOT NULL DEFAULT 'CNY'");
+      } catch { /* вже існує */ }
+      try {
+        await client.execute("ALTER TABLE payments ADD COLUMN exchange_rate TEXT");
+      } catch { /* вже існує */ }
+
+      await client.execute(`
+        CREATE TABLE IF NOT EXISTS extra_expenses (
+          id TEXT PRIMARY KEY,
+          order_id TEXT NOT NULL,
+          description TEXT NOT NULL,
+          amount TEXT NOT NULL,
           created_at TEXT NOT NULL
         )
       `);
@@ -174,8 +194,30 @@ if (useTurso) {
       order_id TEXT NOT NULL,
       type TEXT NOT NULL,
       amount TEXT NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'CNY',
+      exchange_rate TEXT,
       photo_path TEXT,
       note TEXT,
+      created_at TEXT NOT NULL
+    )
+  `);
+
+  // Migration: add currency/exchange_rate to payments if missing
+  const paymentCols = sqlite.prepare("PRAGMA table_info(payments)").all() as { name: string }[];
+  const paymentColNames = paymentCols.map((c: { name: string }) => c.name);
+  if (!paymentColNames.includes("currency")) {
+    sqlite.exec("ALTER TABLE payments ADD COLUMN currency TEXT NOT NULL DEFAULT 'CNY'");
+  }
+  if (!paymentColNames.includes("exchange_rate")) {
+    sqlite.exec("ALTER TABLE payments ADD COLUMN exchange_rate TEXT");
+  }
+
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS extra_expenses (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      description TEXT NOT NULL,
+      amount TEXT NOT NULL,
       created_at TEXT NOT NULL
     )
   `);
