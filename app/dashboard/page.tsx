@@ -69,6 +69,7 @@ export default async function DashboardPage() {
           <NavCard href="/orders" title="Замовлення" desc="Список замовлень, фото товарів" />
           <NavCard href="/clients" title="Клієнти" desc="Список клієнтів, пошук, додавання" />
           <NavCard href="/products" title="Каталог товарів" desc="Моделі, фото, ціни" />
+          <NavCard href="/finance" title="Фінанси" desc="Загальний підсумок, прибутки, витрати" />
           {role === "ADMIN" && (
             <NavCard href="/admin/users" title="Користувачі" desc="Управління акаунтами та ролями" />
           )}
