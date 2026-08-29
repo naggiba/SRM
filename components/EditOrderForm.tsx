@@ -57,6 +57,47 @@ const DELIVERY_OPTIONS = [
   { value: "RAIL", label: "ЖД (залізниця)" },
 ];
 
+const accentMap: Record<string, string> = {
+  gray: "border-gray-200",
+  blue: "border-blue-200",
+};
+
+function CollapsibleSection({
+  title,
+  defaultOpen = false,
+  accent = "gray",
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  accent?: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className={`bg-white rounded-xl border ${accentMap[accent] ?? accentMap.gray} overflow-hidden`}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-4 sm:px-6 py-3 hover:bg-gray-50 transition text-left"
+      >
+        <h2 className="font-semibold text-gray-800 text-sm sm:text-base">{title}</h2>
+        <svg
+          className={`w-4 h-4 text-gray-400 transition-transform duration-200 shrink-0 ml-2 ${open ? "rotate-180" : ""}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="px-4 sm:px-6 py-4 space-y-4 border-t border-gray-100">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function parseColors(colorsStr: string | null): ColorQty[] {
   if (!colorsStr) return [];
   try {
@@ -454,11 +495,9 @@ export default function EditOrderForm({
   const supplierPayments = paymentsState.filter((p) => p.type === "SUPPLIER");
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
-      {/* ── Оплата ── */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-        <h2 className="font-semibold text-gray-800">Оплата</h2>
-        
+    <form onSubmit={handleSubmit} className="space-y-3">
+      {/* ── Оплата та фінансовий підсумок ── */}
+      <CollapsibleSection title="Оплата та фінансовий підсумок" defaultOpen accent="blue">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -499,12 +538,6 @@ export default function EditOrderForm({
             <p className="text-xl font-bold text-orange-700">{wePaidCNY.toFixed(2)} ¥</p>
           </div>
         </div>
-
-        {total > 0 && (
-          <div className={`text-sm px-3 py-2 rounded-lg ${debtFromClient > 0 ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
-            {debtFromClient > 0.001 ? `Борг клієнта: ${debtFromClient.toFixed(2)} ¥` : debtFromClient < -0.001 ? `Переплата: ${Math.abs(debtFromClient).toFixed(2)} ¥` : "Сплачено повністю"}
-          </div>
-        )}
 
         {/* Payment tabs */}
         <div className="flex gap-2 border-b border-gray-200">
@@ -635,12 +668,51 @@ export default function EditOrderForm({
             }}
           />
         </div>
-      </div>
+
+        {/* Фінансовий підсумок */}
+        <div className="pt-3 border-t border-gray-100">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Фінансовий підсумок</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-blue-50 rounded-xl p-3">
+              <p className="text-xs text-blue-500 mb-1">Вартість замовлення</p>
+              <p className="text-xl font-bold text-blue-700">{total.toFixed(2)} ¥</p>
+            </div>
+            <div className="bg-green-50 rounded-xl p-3">
+              <p className="text-xs text-green-500 mb-1">Надходження від клієнта</p>
+              <p className="text-xl font-bold text-green-700">{clientPaidCNY.toFixed(2)} ¥</p>
+              {clientPaidUAH > 0 && (
+                <p className="text-xs text-green-500 mt-0.5">{clientPaidUAH.toFixed(0)} ₴</p>
+              )}
+            </div>
+            <div className="bg-orange-50 rounded-xl p-3">
+              <p className="text-xs text-orange-500 mb-1">Витрати</p>
+              <p className="text-xl font-bold text-orange-700">{wePaidCNY.toFixed(2)} ¥</p>
+              {totalExpensesCNY > 0 && (
+                <p className="text-xs text-orange-400 mt-0.5">+ {totalExpensesCNY.toFixed(2)} ¥ доп.</p>
+              )}
+            </div>
+            <div className={`rounded-xl p-3 ${profit >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
+              <p className={`text-xs mb-1 ${profit >= 0 ? "text-emerald-500" : "text-red-500"}`}>Заробіток</p>
+              <p className={`text-xl font-bold ${profit >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                {profit >= 0 ? "+" : ""}{profit.toFixed(2)} ¥
+              </p>
+            </div>
+          </div>
+          {debtFromClient > 0.001 && (
+            <div className="mt-3 bg-red-50 text-red-700 text-sm px-4 py-2 rounded-lg">
+              Борг клієнта: {debtFromClient.toFixed(2)} ¥
+            </div>
+          )}
+          {debtFromClient < -0.001 && (
+            <div className="mt-3 bg-green-50 text-green-700 text-sm px-4 py-2 rounded-lg">
+              Переплата клієнта: {Math.abs(debtFromClient).toFixed(2)} ¥
+            </div>
+          )}
+        </div>
+      </CollapsibleSection>
 
       {/* ── Додаткові витрати ── */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-        <h2 className="font-semibold text-gray-800">Додаткові витрати</h2>
-
+      <CollapsibleSection title="Додаткові витрати" defaultOpen={expensesState.length > 0}>
         {/* Список витрат */}
         {expensesState.length > 0 ? (
           <div className="space-y-2">
@@ -717,53 +789,10 @@ export default function EditOrderForm({
             + Додати
           </button>
         </div>
-      </div>
-
-      {/* ── Фінансовий підсумок ── */}
-      <div className="bg-white rounded-xl border border-blue-200 p-6 space-y-4">
-        <h2 className="font-semibold text-gray-800">Фінансовий підсумок</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-blue-50 rounded-xl p-4">
-            <p className="text-xs text-blue-500 mb-1">Вартість замовлення</p>
-            <p className="text-2xl font-bold text-blue-700">{total.toFixed(2)} ¥</p>
-          </div>
-          <div className="bg-green-50 rounded-xl p-4">
-            <p className="text-xs text-green-500 mb-1">Надходження від клієнта</p>
-            <p className="text-2xl font-bold text-green-700">{clientPaidCNY.toFixed(2)} ¥</p>
-            {clientPaidUAH > 0 && (
-              <p className="text-xs text-green-500 mt-0.5">{clientPaidUAH.toFixed(0)} ₴</p>
-            )}
-          </div>
-          <div className="bg-orange-50 rounded-xl p-4">
-            <p className="text-xs text-orange-500 mb-1">Витрати</p>
-            <p className="text-2xl font-bold text-orange-700">{wePaidCNY.toFixed(2)} ¥</p>
-            {totalExpensesCNY > 0 && (
-              <p className="text-xs text-orange-400 mt-0.5">+ {totalExpensesCNY.toFixed(2)} ¥ доп.</p>
-            )}
-          </div>
-          <div className={`rounded-xl p-4 ${profit >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
-            <p className={`text-xs mb-1 ${profit >= 0 ? "text-emerald-500" : "text-red-500"}`}>Заробіток</p>
-            <p className={`text-2xl font-bold ${profit >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-              {profit >= 0 ? "+" : ""}{profit.toFixed(2)} ¥
-            </p>
-          </div>
-        </div>
-        {debtFromClient > 0.001 && (
-          <div className="bg-red-50 text-red-700 text-sm px-4 py-2 rounded-lg">
-            Борг клієнта: {debtFromClient.toFixed(2)} ¥
-          </div>
-        )}
-        {debtFromClient < -0.001 && (
-          <div className="bg-green-50 text-green-700 text-sm px-4 py-2 rounded-lg">
-            Переплата клієнта: {Math.abs(debtFromClient).toFixed(2)} ¥
-          </div>
-        )}
-      </div>
+      </CollapsibleSection>
 
       {/* ── Клієнт + статус + примітка ── */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-        <h2 className="font-semibold text-gray-800">Інформація</h2>
-
+      <CollapsibleSection title="Інформація" defaultOpen>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Клієнт</label>
@@ -896,12 +925,10 @@ export default function EditOrderForm({
             <p className="text-xs text-gray-400">Фото підтверджує відправку товару на карго</p>
           </div>
         </div>
-      </div>
+      </CollapsibleSection>
 
       {/* ── Товари ── */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="font-semibold text-gray-800 mb-4">Товари</h2>
-
+      <CollapsibleSection title={`Товари${items.length ? ` (${items.length})` : ""}`} defaultOpen>
         <div
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
@@ -1007,7 +1034,7 @@ export default function EditOrderForm({
             ))}
           </div>
         )}
-      </div>
+      </CollapsibleSection>
 
       {error && <p className="text-red-500 text-sm bg-red-50 px-4 py-3 rounded-lg">{error}</p>}
 
