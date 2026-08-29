@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { orders, orderItems, payments, Order, OrderItem, Payment } from "@/lib/schema";
 import { desc } from "drizzle-orm";
-import OrdersList from "@/components/OrdersList";
+import OrdersView from "@/components/OrdersView";
 
 export default async function OrdersPage() {
   const session = await getServerSession(authOptions);
@@ -49,9 +49,9 @@ export default async function OrdersPage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-10">
-        <OrdersList
-          initialOrders={data}
+      <main className="max-w-7xl mx-auto px-6 py-10">
+        <OrdersView
+          orders={data}
           canEdit={role !== "VIEWER"}
           canDelete={role === "ADMIN"}
         />
