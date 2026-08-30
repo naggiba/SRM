@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { clientId, clientName, note, totalPrice, clientPaid, wePaid, deliveryType, estimatedShipDate, items } = body;
+  const { clientId, clientName, note, totalPrice, supplierTotal, clientPaid, wePaid, deliveryType, estimatedShipDate, items } = body;
 
   const orderId = randomUUID();
   const now = new Date().toISOString();
@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
     clientName: clientName?.trim() || null,
     note: note?.trim() || null,
     totalPrice: totalPrice?.trim() || null,
+    supplierTotal: supplierTotal?.trim() || null,
     clientPaid: clientPaid?.trim() || null,
     wePaid: wePaid?.trim() || null,
     deliveryType: deliveryType || null,

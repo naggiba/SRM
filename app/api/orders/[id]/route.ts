@@ -49,6 +49,7 @@ export async function PATCH(
   if (body.note !== undefined) updates.note = body.note?.trim() || null;
   if (body.clientName !== undefined) updates.clientName = body.clientName?.trim() || null;
   if (body.totalPrice !== undefined) updates.totalPrice = body.totalPrice?.trim() || null;
+  if (body.supplierTotal !== undefined) updates.supplierTotal = body.supplierTotal?.trim() || null;
   if (body.deliveryType !== undefined) updates.deliveryType = body.deliveryType || null;
   if (body.estimatedShipDate !== undefined) updates.estimatedShipDate = body.estimatedShipDate || null;
   if (body.orderDate !== undefined) updates.orderDate = body.orderDate || null;

@@ -38,6 +38,7 @@ export default function NewOrderForm({ clients }: { clients: ClientOption[] }) {
   const [clientName, setClientName] = useState("");
   const [note, setNote] = useState("");
   const [totalPrice, setTotalPrice] = useState("");
+  const [supplierTotal, setSupplierTotal] = useState("");
   const [clientPaid, setClientPaid] = useState("");
   const [wePaid, setWePaid] = useState("");
   const [items, setItems] = useState<ItemDraft[]>([]);
@@ -200,6 +201,7 @@ export default function NewOrderForm({ clients }: { clients: ClientOption[] }) {
         clientName: clientId ? clients.find((c) => c.id === clientId)?.name : clientName,
         note,
         totalPrice,
+        supplierTotal,
         clientPaid,
         wePaid,
         items: items.map(({ photoPath, supplier, modelNumber, price, colors }) => ({
@@ -265,7 +267,7 @@ export default function NewOrderForm({ clients }: { clients: ClientOption[] }) {
       {/* ── Оплата ── */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
         <h2 className="font-semibold text-gray-800">Оплата</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Загальна вартість
@@ -288,6 +290,24 @@ export default function NewOrderForm({ clients }: { clients: ClientOption[] }) {
             {calculatedTotal > 0 && (
               <p className="text-xs text-gray-400 mt-1">
                 Авто: {calculatedTotal.toFixed(2)} (ціна × кількість)
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              До оплати постачальнику
+            </label>
+            <input
+              value={supplierTotal}
+              onChange={(e) => setSupplierTotal(e.target.value)}
+              placeholder="0.00"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {parseFloat(supplierTotal) > 0 && wePaidNum > 0 && (
+              <p className={`text-xs mt-1 ${parseFloat(supplierTotal) - wePaidNum > 0 ? "text-red-500" : "text-green-500"}`}>
+                {parseFloat(supplierTotal) - wePaidNum > 0
+                  ? `Залишок: ${(parseFloat(supplierTotal) - wePaidNum).toFixed(2)} ¥`
+                  : "Оплачено повністю"}
               </p>
             )}
           </div>

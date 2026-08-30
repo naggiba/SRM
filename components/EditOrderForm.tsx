@@ -138,6 +138,7 @@ export default function EditOrderForm({
   const [note, setNote] = useState(order.note ?? "");
   const [status, setStatus] = useState(order.status as string);
   const [totalPrice, setTotalPrice] = useState(order.totalPrice ?? "");
+  const [supplierTotal, setSupplierTotal] = useState(order.supplierTotal ?? "");
   const [deliveryType, setDeliveryType] = useState(order.deliveryType ?? "");
   const [estimatedShipDate, setEstimatedShipDate] = useState(order.estimatedShipDate ?? "");
   const [orderDate, setOrderDate] = useState(order.orderDate ?? "");
@@ -430,6 +431,7 @@ export default function EditOrderForm({
         note,
         status,
         totalPrice,
+        supplierTotal,
         deliveryType: deliveryType || null,
         estimatedShipDate: estimatedShipDate || null,
         orderDate: orderDate || null,
@@ -536,7 +538,7 @@ export default function EditOrderForm({
     <form onSubmit={handleSubmit} className="space-y-3">
       {/* ── Оплата та фінансовий підсумок ── */}
       <CollapsibleSection title="Оплата та фінансовий підсумок" defaultOpen accent="blue">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Загальна вартість
@@ -561,6 +563,24 @@ export default function EditOrderForm({
             {calculatedTotal > 0 && (
               <p className="text-xs text-gray-400 mt-1">
                 Авто: {calculatedTotal.toFixed(2)} (ціна × кількість)
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              До оплати постачальнику
+            </label>
+            <input
+              value={supplierTotal}
+              onChange={(e) => setSupplierTotal(e.target.value)}
+              placeholder="0.00"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {parseFloat(supplierTotal) > 0 && (
+              <p className={`text-xs mt-1 ${parseFloat(supplierTotal) - wePaidCNY > 0 ? "text-red-500" : "text-green-500"}`}>
+                {parseFloat(supplierTotal) - wePaidCNY > 0
+                  ? `Залишок: ${(parseFloat(supplierTotal) - wePaidCNY).toFixed(2)} ¥`
+                  : "Оплачено повністю"}
               </p>
             )}
           </div>

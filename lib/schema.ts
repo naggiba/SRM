@@ -34,6 +34,7 @@ export const orders = sqliteTable("orders", {
   clientName: text("client_name"),
   note: text("note"),
   totalPrice: text("total_price"),
+  supplierTotal: text("supplier_total"),     // сума до оплати постачальнику
   clientPaid: text("client_paid"),
   wePaid: text("we_paid"),
   deliveryType: text("delivery_type", { enum: ["AIR", "RAIL"] }),
