@@ -46,15 +46,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       period,
       orderCount: 0,
-      totalCNY: 0,
-      clientPaidCNY: 0,
-      clientPaidUAH: 0,
-      wePaidCNY: 0,
-      expensesCNY: 0,
-      profit: 0,
+      income: 0,
+      incomeUAH: 0,
+      expenses: 0,
+      profitSentOnly: 0,
+      treasury: 0,
       withdrawalsCNY,
       withdrawalsByCategory: byCategory,
-      balanceAfterWithdrawals: -withdrawalsCNY,
       byOrder: [],
     });
   }
@@ -73,10 +71,8 @@ export async function GET(req: NextRequest) {
   const filteredPayments = allPayments.filter((p) => orderIdSet.has(p.orderId));
   const filteredExpenses = allExpenses.filter((e) => orderIdSet.has(e.orderId));
 
-  // Підсумки
-  const totalCNY = allOrders.reduce((s, o) => s + (parseFloat(o.totalPrice ?? "0") || 0), 0);
-
-  const clientPaidCNY = filteredPayments
+  // --- Надходження: всі оплати від клієнтів (конвертовано в CNY) ---
+  const income = filteredPayments
     .filter((p) => p.type === "CLIENT")
     .reduce((s, p) => {
       const amt = parseFloat(p.amount) || 0;
@@ -87,18 +83,47 @@ export async function GET(req: NextRequest) {
       return s + amt;
     }, 0);
 
-  const clientPaidUAH = filteredPayments
+  const incomeUAH = filteredPayments
     .filter((p) => p.type === "CLIENT" && p.currency === "UAH")
     .reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
 
-  const wePaidCNY = filteredPayments
+  // --- Витрати: постачальники + додаткові витрати ---
+  const supplierPaid = filteredPayments
     .filter((p) => p.type === "SUPPLIER")
     .reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
 
-  const expensesCNY = filteredExpenses
+  const extraExp = filteredExpenses
     .reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
 
-  const profit = clientPaidCNY - wePaidCNY - expensesCNY;
+  const expenses = supplierPaid + extraExp;
+
+  // --- Казна: надходження мінус витрати постачальникам (вільні кошти на руках) ---
+  const treasury = income - expenses;
+
+  // --- Заробіток: тільки по замовленнях зі статусом SENT_TO_CARGO ---
+  const sentOrders = allOrders.filter((o) => o.status === "SENT_TO_CARGO");
+  const sentOrderIds = new Set(sentOrders.map((o) => o.id));
+
+  const sentIncome = filteredPayments
+    .filter((p) => p.type === "CLIENT" && sentOrderIds.has(p.orderId))
+    .reduce((s, p) => {
+      const amt = parseFloat(p.amount) || 0;
+      if (p.currency === "UAH") {
+        const rate = parseFloat(p.exchangeRate ?? "0") || 0;
+        return s + (rate > 0 ? amt / rate : 0);
+      }
+      return s + amt;
+    }, 0);
+
+  const sentSupplier = filteredPayments
+    .filter((p) => p.type === "SUPPLIER" && sentOrderIds.has(p.orderId))
+    .reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+
+  const sentExtra = filteredExpenses
+    .filter((e) => sentOrderIds.has(e.orderId))
+    .reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+
+  const profitSentOnly = sentIncome - sentSupplier - sentExtra;
 
   // По кожному замовленню
   const byOrder = allOrders.map((o) => {
@@ -139,15 +164,13 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     period,
     orderCount: allOrders.length,
-    totalCNY,
-    clientPaidCNY,
-    clientPaidUAH,
-    wePaidCNY,
-    expensesCNY,
-    profit,
+    income,
+    incomeUAH,
+    expenses,
+    profitSentOnly,
+    treasury,
     withdrawalsCNY,
     withdrawalsByCategory: byCategory,
-    balanceAfterWithdrawals: profit - withdrawalsCNY,
     byOrder,
   });
 }
