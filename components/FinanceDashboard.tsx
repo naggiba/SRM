@@ -62,7 +62,7 @@ export default function FinanceDashboard() {
   const [period, setPeriod] = useState<Period>("month");
   const [data, setData] = useState<FinanceData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [openSection, setOpenSection] = useState<"orders" | "withdrawals" | null>("orders");
+  const [tableOpen, setTableOpen] = useState(true);
 
   const [categories, setCategories] = useState<WithdrawalCategory[]>([]);
   const [withdrawalsList, setWithdrawalsList] = useState<WithdrawalRow[]>([]);
@@ -214,118 +214,30 @@ export default function FinanceDashboard() {
         </div>
       </div>
 
-      {/* === Секції (акордеон) === */}
+      {/* === Таблиця: замовлення + виплати === */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        {/* По замовленнях */}
         <button
-          onClick={() => setOpenSection(openSection === "orders" ? null : "orders")}
+          onClick={() => setTableOpen((v) => !v)}
           className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition"
         >
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-gray-800 text-sm">По замовленнях</span>
-            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{data.orderCount}</span>
-          </div>
-          <svg className={`w-4 h-4 text-gray-400 transition-transform ${openSection === "orders" ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
-        </button>
-
-        {openSection === "orders" && data.byOrder.length > 0 && (
-          <div className="border-t border-gray-100">
-            {/* Мобільні картки */}
-            <div className="sm:hidden divide-y divide-gray-50">
-              {data.byOrder.map((o) => (
-                <a key={o.id} href={`/orders/${o.id}`} className="block px-4 py-3 hover:bg-gray-50 transition">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-gray-800 text-sm">{o.clientName ?? "—"}</span>
-                    <span className={`text-sm font-semibold ${o.profit >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                      {o.profit >= 0 ? "+" : ""}{o.profit.toFixed(0)} ¥
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <span>{o.orderDate ?? new Date(o.createdAt).toLocaleDateString("uk-UA")}</span>
-                    <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{STATUS_LABELS[o.status] ?? o.status}</span>
-                  </div>
-                  <div className="flex gap-3 mt-1 text-xs">
-                    <span className="text-green-600">+{o.clientPaidCNY.toFixed(0)}</span>
-                    <span className="text-orange-600">-{(o.wePaidCNY + o.expensesCNY).toFixed(0)}</span>
-                  </div>
-                </a>
-              ))}
-            </div>
-
-            {/* Десктопна таблиця */}
-            <div className="hidden sm:block overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50/80 text-xs text-gray-500 uppercase">
-                  <tr>
-                    <th className="px-4 py-2.5 text-left">Клієнт</th>
-                    <th className="px-4 py-2.5 text-left">Дата</th>
-                    <th className="px-4 py-2.5 text-left">Статус</th>
-                    <th className="px-4 py-2.5 text-right">Надійшло</th>
-                    <th className="px-4 py-2.5 text-right">Витрачено</th>
-                    <th className="px-4 py-2.5 text-right">Прибуток</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {data.byOrder.map((o) => (
-                    <tr key={o.id} className="hover:bg-gray-50 transition">
-                      <td className="px-4 py-2.5 font-medium text-gray-800">
-                        <a href={`/orders/${o.id}`} className="hover:text-blue-600 hover:underline">{o.clientName ?? "—"}</a>
-                      </td>
-                      <td className="px-4 py-2.5 text-gray-500">{o.orderDate ?? new Date(o.createdAt).toLocaleDateString("uk-UA")}</td>
-                      <td className="px-4 py-2.5">
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{STATUS_LABELS[o.status] ?? o.status}</span>
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-green-700">{o.clientPaidCNY.toFixed(2)} ¥</td>
-                      <td className="px-4 py-2.5 text-right text-orange-700">{(o.wePaidCNY + o.expensesCNY).toFixed(2)} ¥</td>
-                      <td className={`px-4 py-2.5 text-right font-semibold ${o.profit >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                        {o.profit >= 0 ? "+" : ""}{o.profit.toFixed(2)} ¥
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-gray-50/80 font-semibold text-sm border-t border-gray-200">
-                  <tr>
-                    <td className="px-4 py-2.5 text-gray-600" colSpan={3}>Разом</td>
-                    <td className="px-4 py-2.5 text-right text-green-700">{data.income.toFixed(2)} ¥</td>
-                    <td className="px-4 py-2.5 text-right text-orange-700">{data.expenses.toFixed(2)} ¥</td>
-                    <td className={`px-4 py-2.5 text-right ${data.profitSentOnly >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                      {data.profitSentOnly >= 0 ? "+" : ""}{data.profitSentOnly.toFixed(2)} ¥
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {openSection === "orders" && data.byOrder.length === 0 && (
-          <p className="text-sm text-gray-400 px-5 py-4 border-t border-gray-100">Немає замовлень за цей період</p>
-        )}
-
-        {/* Виплати */}
-        <button
-          onClick={() => setOpenSection(openSection === "withdrawals" ? null : "withdrawals")}
-          className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition border-t border-gray-100"
-        >
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-gray-800 text-sm">Виплати собі</span>
-            {data.withdrawalsCNY > 0 && (
-              <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">{data.withdrawalsCNY.toFixed(0)} ¥</span>
-            )}
+            <span className="font-semibold text-gray-800 text-sm">Рух коштів</span>
+            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{data.orderCount + withdrawalsList.length}</span>
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={(e) => { e.stopPropagation(); setShowWithdrawForm((v) => !v); setOpenSection("withdrawals"); }}
+              onClick={(e) => { e.stopPropagation(); setShowWithdrawForm((v) => !v); setTableOpen(true); }}
               className="text-xs px-2.5 py-1 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded-lg font-medium transition"
             >
-              {showWithdrawForm ? "Скасувати" : "+ Додати"}
+              {showWithdrawForm ? "Скасувати" : "+ Виплата"}
             </button>
-            <svg className={`w-4 h-4 text-gray-400 transition-transform ${openSection === "withdrawals" ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${tableOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
           </div>
         </button>
 
-        {openSection === "withdrawals" && (
+        {tableOpen && (
           <div className="border-t border-gray-100">
+            {/* Форма додавання виплати */}
             {showWithdrawForm && (
               <form onSubmit={handleAddWithdrawal} className="px-5 py-4 border-b border-gray-100 bg-purple-50/30 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -368,27 +280,144 @@ export default function FinanceDashboard() {
               </form>
             )}
 
-            {withdrawalsList.length > 0 ? (
-              <div className="divide-y divide-gray-50">
-                {withdrawalsList.map((w) => (
-                  <div key={w.id} className="flex items-center justify-between px-5 py-2.5">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">{w.categoryName}</span>
-                        <span className="text-xs text-gray-400">{new Date(w.createdAt).toLocaleDateString("uk-UA")}</span>
-                      </div>
-                      {w.note && <p className="text-xs text-gray-400 mt-0.5 truncate">{w.note}</p>}
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-sm font-semibold text-purple-700">-{parseFloat(w.amount).toFixed(0)} ¥</span>
-                      <button onClick={() => handleDeleteWithdrawal(w.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
-                    </div>
+            {(() => {
+              // Об'єднуємо замовлення і виплати в один список, сортуємо по даті
+              type MergedRow = { type: "order"; data: OrderRow; date: string } | { type: "withdrawal"; data: WithdrawalRow; date: string };
+              const merged: MergedRow[] = [
+                ...data.byOrder.map((o) => ({ type: "order" as const, data: o, date: o.createdAt })),
+                ...withdrawalsList.map((w) => ({ type: "withdrawal" as const, data: w, date: w.createdAt })),
+              ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+              if (merged.length === 0) {
+                return <p className="text-sm text-gray-400 px-5 py-4">Немає даних за цей період</p>;
+              }
+
+              return (
+                <>
+                  {/* Мобільні картки */}
+                  <div className="sm:hidden divide-y divide-gray-50">
+                    {merged.map((row) => {
+                      if (row.type === "order") {
+                        const o = row.data;
+                        return (
+                          <a key={`o-${o.id}`} href={`/orders/${o.id}`} className="block px-4 py-3 hover:bg-gray-50 transition">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-medium text-gray-800 text-sm">{o.clientName ?? "—"}</span>
+                              <span className={`text-sm font-semibold ${o.profit >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                                {o.profit >= 0 ? "+" : ""}{o.profit.toFixed(0)} ¥
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                              <span>{o.orderDate ?? new Date(o.createdAt).toLocaleDateString("uk-UA")}</span>
+                              <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{STATUS_LABELS[o.status] ?? o.status}</span>
+                            </div>
+                            <div className="flex gap-3 mt-1 text-xs">
+                              <span className="text-green-600">+{o.clientPaidCNY.toFixed(0)}</span>
+                              <span className="text-orange-600">-{(o.wePaidCNY + o.expensesCNY).toFixed(0)}</span>
+                            </div>
+                          </a>
+                        );
+                      } else {
+                        const w = row.data;
+                        return (
+                          <div key={`w-${w.id}`} className="flex items-center justify-between px-4 py-3 bg-purple-50/40">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="text-xs font-semibold text-purple-700">Виплата</span>
+                                <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded">{w.categoryName}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-gray-400">
+                                <span>{new Date(w.createdAt).toLocaleDateString("uk-UA")}</span>
+                                {w.note && <span className="truncate">{w.note}</span>}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-sm font-semibold text-purple-700">-{parseFloat(w.amount).toFixed(0)} ¥</span>
+                              <button onClick={() => handleDeleteWithdrawal(w.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                            </div>
+                          </div>
+                        );
+                      }
+                    })}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400 px-5 py-4">Ще немає виплат</p>
-            )}
+
+                  {/* Десктопна таблиця */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50/80 text-xs text-gray-500 uppercase">
+                        <tr>
+                          <th className="px-4 py-2.5 text-left">Опис</th>
+                          <th className="px-4 py-2.5 text-left">Дата</th>
+                          <th className="px-4 py-2.5 text-left">Статус</th>
+                          <th className="px-4 py-2.5 text-right">Надійшло</th>
+                          <th className="px-4 py-2.5 text-right">Витрачено</th>
+                          <th className="px-4 py-2.5 text-right">Прибуток</th>
+                          <th className="px-4 py-2.5 text-right w-8"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {merged.map((row) => {
+                          if (row.type === "order") {
+                            const o = row.data;
+                            return (
+                              <tr key={`o-${o.id}`} className="hover:bg-gray-50 transition">
+                                <td className="px-4 py-2.5 font-medium text-gray-800">
+                                  <a href={`/orders/${o.id}`} className="hover:text-blue-600 hover:underline">{o.clientName ?? "—"}</a>
+                                </td>
+                                <td className="px-4 py-2.5 text-gray-500">{o.orderDate ?? new Date(o.createdAt).toLocaleDateString("uk-UA")}</td>
+                                <td className="px-4 py-2.5">
+                                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{STATUS_LABELS[o.status] ?? o.status}</span>
+                                </td>
+                                <td className="px-4 py-2.5 text-right text-green-700">{o.clientPaidCNY.toFixed(2)} ¥</td>
+                                <td className="px-4 py-2.5 text-right text-orange-700">{(o.wePaidCNY + o.expensesCNY).toFixed(2)} ¥</td>
+                                <td className={`px-4 py-2.5 text-right font-semibold ${o.profit >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                                  {o.profit >= 0 ? "+" : ""}{o.profit.toFixed(2)} ¥
+                                </td>
+                                <td className="px-4 py-2.5"></td>
+                              </tr>
+                            );
+                          } else {
+                            const w = row.data;
+                            return (
+                              <tr key={`w-${w.id}`} className="bg-purple-50/40 hover:bg-purple-50/60 transition">
+                                <td className="px-4 py-2.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Виплата</span>
+                                    <span className="text-sm text-gray-700">{w.categoryName}</span>
+                                    {w.note && <span className="text-xs text-gray-400 truncate max-w-[150px]">{w.note}</span>}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-2.5 text-gray-500">{new Date(w.createdAt).toLocaleDateString("uk-UA")}</td>
+                                <td className="px-4 py-2.5">
+                                  <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">Виплата</span>
+                                </td>
+                                <td className="px-4 py-2.5 text-right text-gray-300">—</td>
+                                <td className="px-4 py-2.5 text-right font-semibold text-purple-700">{parseFloat(w.amount).toFixed(2)} ¥</td>
+                                <td className="px-4 py-2.5 text-right font-semibold text-purple-700">-{parseFloat(w.amount).toFixed(2)} ¥</td>
+                                <td className="px-4 py-2.5 text-right">
+                                  <button onClick={() => handleDeleteWithdrawal(w.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                                </td>
+                              </tr>
+                            );
+                          }
+                        })}
+                      </tbody>
+                      <tfoot className="bg-gray-50/80 font-semibold text-sm border-t border-gray-200">
+                        <tr>
+                          <td className="px-4 py-2.5 text-gray-600" colSpan={3}>Разом</td>
+                          <td className="px-4 py-2.5 text-right text-green-700">{data.income.toFixed(2)} ¥</td>
+                          <td className="px-4 py-2.5 text-right text-orange-700">{(data.expenses + data.withdrawalsCNY).toFixed(2)} ¥</td>
+                          <td className={`px-4 py-2.5 text-right ${data.profitSentOnly - data.withdrawalsCNY >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                            {data.profitSentOnly - data.withdrawalsCNY >= 0 ? "+" : ""}{(data.profitSentOnly - data.withdrawalsCNY).toFixed(2)} ¥
+                          </td>
+                          <td className="px-4 py-2.5"></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
       </div>
