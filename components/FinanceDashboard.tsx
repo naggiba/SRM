@@ -63,6 +63,7 @@ export default function FinanceDashboard() {
   const [data, setData] = useState<FinanceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [tableOpen, setTableOpen] = useState(true);
+  const [sortDateAsc, setSortDateAsc] = useState(false); // false = новіші зверху
 
   const [categories, setCategories] = useState<WithdrawalCategory[]>([]);
   const [withdrawalsList, setWithdrawalsList] = useState<WithdrawalRow[]>([]);
@@ -286,7 +287,10 @@ export default function FinanceDashboard() {
               const merged: MergedRow[] = [
                 ...data.byOrder.map((o) => ({ type: "order" as const, data: o, date: o.createdAt })),
                 ...withdrawalsList.map((w) => ({ type: "withdrawal" as const, data: w, date: w.createdAt })),
-              ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+              ].sort((a, b) => sortDateAsc
+                ? new Date(a.date).getTime() - new Date(b.date).getTime()
+                : new Date(b.date).getTime() - new Date(a.date).getTime()
+              );
 
               if (merged.length === 0) {
                 return <p className="text-sm text-gray-400 px-5 py-4">Немає даних за цей період</p>;
@@ -294,6 +298,17 @@ export default function FinanceDashboard() {
 
               return (
                 <>
+                  {/* Кнопка сортування (мобіль) */}
+                  <div className="sm:hidden flex justify-end px-4 py-2 border-b border-gray-50">
+                    <button
+                      onClick={() => setSortDateAsc((v) => !v)}
+                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 transition"
+                    >
+                      Дата
+                      <svg className={`w-3 h-3 transition-transform ${sortDateAsc ? "" : "rotate-180"}`} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7"/></svg>
+                    </button>
+                  </div>
+
                   {/* Мобільні картки */}
                   <div className="sm:hidden divide-y divide-gray-50">
                     {merged.map((row) => {
@@ -347,7 +362,12 @@ export default function FinanceDashboard() {
                       <thead className="bg-gray-50/80 text-xs text-gray-500 uppercase">
                         <tr>
                           <th className="px-4 py-2.5 text-left">Опис</th>
-                          <th className="px-4 py-2.5 text-left">Дата</th>
+                          <th className="px-4 py-2.5 text-left">
+                            <button onClick={() => setSortDateAsc((v) => !v)} className="flex items-center gap-1 hover:text-gray-800 transition">
+                              Дата
+                              <svg className={`w-3 h-3 transition-transform ${sortDateAsc ? "" : "rotate-180"}`} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7"/></svg>
+                            </button>
+                          </th>
                           <th className="px-4 py-2.5 text-left">Статус</th>
                           <th className="px-4 py-2.5 text-right">Надійшло</th>
                           <th className="px-4 py-2.5 text-right">Витрачено</th>
