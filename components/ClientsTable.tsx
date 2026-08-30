@@ -387,55 +387,57 @@ function ClientForm({
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+    <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 mb-6">
       <h2 className="font-semibold text-gray-800 mb-4">
         {client ? "Редагувати клієнта" : "Новий клієнт"}
       </h2>
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Ім&apos;я <span className="text-red-500">*</span>
-          </label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            placeholder="Іваненко Іван"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-        </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Ім&apos;я <span className="text-red-500">*</span>
+            </label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              placeholder="Іваненко Іван"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Telegram
-          </label>
-          <input
-            value={telegram}
-            onChange={(e) => setTelegram(e.target.value)}
-            placeholder="@username"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Telegram
+            </label>
+            <input
+              value={telegram}
+              onChange={(e) => setTelegram(e.target.value)}
+              placeholder="@username"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Код карго
-          </label>
-          <input
-            value={cargoCode}
-            onChange={(e) => setCargoCode(e.target.value)}
-            placeholder="UA-12345"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Код карго
+            </label>
+            <input
+              value={cargoCode}
+              onChange={(e) => setCargoCode(e.target.value)}
+              placeholder="UA-12345"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+            />
+          </div>
         </div>
 
         {error && (
-          <p className="col-span-3 text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">
+          <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">
             {error}
           </p>
         )}
 
-        <div className="col-span-3 flex gap-3 justify-end">
+        <div className="flex gap-3 justify-end pt-2">
           <button
             type="button"
             onClick={onCancel}
@@ -446,7 +448,7 @@ function ClientForm({
           <button
             type="submit"
             disabled={loading}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50"
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50"
           >
             {loading ? "Збереження..." : "Зберегти"}
           </button>
