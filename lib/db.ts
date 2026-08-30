@@ -34,6 +34,8 @@ if (useTurso) {
   sqlite.exec(`CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, order_id TEXT NOT NULL, type TEXT NOT NULL, amount TEXT NOT NULL, currency TEXT NOT NULL DEFAULT 'CNY', exchange_rate TEXT, photo_path TEXT, note TEXT, created_at TEXT NOT NULL)`);
   sqlite.exec(`CREATE TABLE IF NOT EXISTS extra_expenses (id TEXT PRIMARY KEY, order_id TEXT NOT NULL, description TEXT NOT NULL, amount TEXT NOT NULL, created_at TEXT NOT NULL)`);
   sqlite.exec(`CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, model_number TEXT NOT NULL UNIQUE, photo_path TEXT, supplier TEXT, price TEXT, note TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS withdrawal_categories (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL)`);
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS withdrawals (id TEXT PRIMARY KEY, category_id TEXT, category_name TEXT NOT NULL, amount TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL, created_by TEXT NOT NULL)`);
 
   // Migrations
   const paymentCols = sqlite.prepare("PRAGMA table_info(payments)").all() as { name: string }[];

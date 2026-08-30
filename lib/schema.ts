@@ -106,6 +106,27 @@ export const products = sqliteTable("products", {
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 
+// ── Withdrawals (виплати — вивід зароблених коштів) ──────────────────────────
+
+export const withdrawalCategories = sqliteTable("withdrawal_categories", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const withdrawals = sqliteTable("withdrawals", {
+  id: text("id").primaryKey(),
+  categoryId: text("category_id"),
+  categoryName: text("category_name").notNull(),
+  amount: text("amount").notNull(),      // сума в ¥
+  note: text("note"),
+  createdAt: text("created_at").notNull(),
+  createdBy: text("created_by").notNull(),
+});
+
+export type WithdrawalCategory = typeof withdrawalCategories.$inferSelect;
+export type Withdrawal = typeof withdrawals.$inferSelect;
+
 // Типи для кольорів
 export interface ColorQty {
   color: string;

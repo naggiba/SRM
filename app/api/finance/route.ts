@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { orders, payments, extraExpenses } from "@/lib/schema";
+import { orders, payments, extraExpenses, withdrawals } from "@/lib/schema";
 import { gte } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
@@ -31,6 +31,17 @@ export async function GET(req: NextRequest) {
 
   const orderIds = allOrders.map((o) => o.id);
 
+  // Виплати (виводи зароблених коштів) за період
+  const allWithdrawals = since
+    ? await db.select().from(withdrawals).where(gte(withdrawals.createdAt, since))
+    : await db.select().from(withdrawals);
+  const withdrawalsCNY = allWithdrawals.reduce((s, w) => s + (parseFloat(w.amount) || 0), 0);
+
+  const byCategory: Record<string, number> = {};
+  for (const w of allWithdrawals) {
+    byCategory[w.categoryName] = (byCategory[w.categoryName] ?? 0) + (parseFloat(w.amount) || 0);
+  }
+
   if (orderIds.length === 0) {
     return NextResponse.json({
       period,
@@ -41,6 +52,9 @@ export async function GET(req: NextRequest) {
       wePaidCNY: 0,
       expensesCNY: 0,
       profit: 0,
+      withdrawalsCNY,
+      withdrawalsByCategory: byCategory,
+      balanceAfterWithdrawals: -withdrawalsCNY,
       byOrder: [],
     });
   }
@@ -131,6 +145,9 @@ export async function GET(req: NextRequest) {
     wePaidCNY,
     expensesCNY,
     profit,
+    withdrawalsCNY,
+    withdrawalsByCategory: byCategory,
+    balanceAfterWithdrawals: profit - withdrawalsCNY,
     byOrder,
   });
 }

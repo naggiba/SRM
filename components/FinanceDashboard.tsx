@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 type Period = "all" | "month" | "week";
 
@@ -26,7 +26,25 @@ interface FinanceData {
   wePaidCNY: number;
   expensesCNY: number;
   profit: number;
+  withdrawalsCNY: number;
+  withdrawalsByCategory: Record<string, number>;
+  balanceAfterWithdrawals: number;
   byOrder: OrderRow[];
+}
+
+interface WithdrawalCategory {
+  id: string;
+  name: string;
+}
+
+interface WithdrawalRow {
+  id: string;
+  categoryId: string | null;
+  categoryName: string;
+  amount: string;
+  note: string | null;
+  createdAt: string;
+  createdBy: string;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -47,16 +65,102 @@ export default function FinanceDashboard() {
   const [data, setData] = useState<FinanceData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      fetch(`/api/finance?period=${period}`)
-        .then((r) => r.json())
-        .then((d) => { if (!cancelled) { setData(d); setLoading(false); } })
-        .catch(() => { if (!cancelled) setLoading(false); });
-    }, 0);
-    return () => { cancelled = true; clearTimeout(timer); };
+  const [categories, setCategories] = useState<WithdrawalCategory[]>([]);
+  const [withdrawalsList, setWithdrawalsList] = useState<WithdrawalRow[]>([]);
+  const [showWithdrawForm, setShowWithdrawForm] = useState(false);
+  const [wCategoryId, setWCategoryId] = useState("");
+  const [wNewCategory, setWNewCategory] = useState("");
+  const [wAmount, setWAmount] = useState("");
+  const [wNote, setWNote] = useState("");
+  const [wSaving, setWSaving] = useState(false);
+  const [wError, setWError] = useState("");
+
+  const loadFinance = useCallback(() => {
+    fetch(`/api/finance?period=${period}`)
+      .then((r) => r.json())
+      .then((d) => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
   }, [period]);
+
+  const loadWithdrawals = useCallback(() => {
+    fetch(`/api/withdrawals?period=${period}`)
+      .then((r) => r.json())
+      .then((d) => setWithdrawalsList(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, [period]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(true);
+      loadFinance();
+      loadWithdrawals();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [period, loadFinance, loadWithdrawals]);
+
+  useEffect(() => {
+    fetch("/api/withdrawal-categories")
+      .then((r) => r.json())
+      .then((d) => setCategories(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, []);
+
+  async function handleAddWithdrawal(e: React.FormEvent) {
+    e.preventDefault();
+    setWError("");
+
+    const categoryName = wCategoryId
+      ? categories.find((c) => c.id === wCategoryId)?.name ?? ""
+      : wNewCategory.trim();
+
+    if (!categoryName) {
+      setWError("Оберіть або введіть категорію");
+      return;
+    }
+    if (!wAmount || parseFloat(wAmount) <= 0) {
+      setWError("Вкажіть коректну суму");
+      return;
+    }
+
+    setWSaving(true);
+    const res = await fetch("/api/withdrawals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        categoryId: wCategoryId || null,
+        categoryName,
+        amount: wAmount,
+        note: wNote,
+      }),
+    });
+    setWSaving(false);
+
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setWError(d.error ?? "Помилка збереження");
+      return;
+    }
+
+    setWCategoryId("");
+    setWNewCategory("");
+    setWAmount("");
+    setWNote("");
+    setShowWithdrawForm(false);
+
+    // Оновлюємо категорії (могла з'явитись нова) та дані
+    fetch("/api/withdrawal-categories").then((r) => r.json()).then((d) => setCategories(Array.isArray(d) ? d : []));
+    loadFinance();
+    loadWithdrawals();
+  }
+
+  async function handleDeleteWithdrawal(id: string) {
+    if (!confirm("Видалити виплату?")) return;
+    const res = await fetch(`/api/withdrawals/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      loadFinance();
+      loadWithdrawals();
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -118,6 +222,117 @@ export default function FinanceDashboard() {
               color={data.profit >= 0 ? "emerald" : "red"}
               big
             />
+          </div>
+
+          {/* Виплати (вивід зароблених коштів) */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-gray-800">Виплати собі</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Заробіток за період: <span className="font-medium text-gray-600">{data.profit.toFixed(2)} ¥</span>
+                  {" · "}Виведено: <span className="font-medium text-gray-600">{data.withdrawalsCNY.toFixed(2)} ¥</span>
+                  {" · "}Залишок: <span className={`font-semibold ${data.balanceAfterWithdrawals >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    {data.balanceAfterWithdrawals >= 0 ? "+" : ""}{data.balanceAfterWithdrawals.toFixed(2)} ¥
+                  </span>
+                </p>
+              </div>
+              <button
+                onClick={() => setShowWithdrawForm((v) => !v)}
+                className="text-sm px-3 py-1.5 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded-lg font-medium transition shrink-0"
+              >
+                {showWithdrawForm ? "Скасувати" : "+ Забрати кошти"}
+              </button>
+            </div>
+
+            {showWithdrawForm && (
+              <form onSubmit={handleAddWithdrawal} className="px-5 py-4 border-b border-gray-100 bg-purple-50/40 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Категорія</label>
+                    <select
+                      value={wCategoryId}
+                      onChange={(e) => { setWCategoryId(e.target.value); if (e.target.value) setWNewCategory(""); }}
+                      className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm bg-white"
+                    >
+                      <option value="">— нова категорія —</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                    {!wCategoryId && (
+                      <input
+                        value={wNewCategory}
+                        onChange={(e) => setWNewCategory(e.target.value)}
+                        placeholder="Напр. Особисті витрати"
+                        className="w-full mt-2 px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Сума (¥)</label>
+                    <input
+                      value={wAmount}
+                      onChange={(e) => setWAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Примітка (опційно)</label>
+                    <input
+                      value={wNote}
+                      onChange={(e) => setWNote(e.target.value)}
+                      placeholder="Деталі..."
+                      className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+
+                {wError && (
+                  <p className="text-red-500 text-sm bg-red-50 px-3 py-1.5 rounded-lg">{wError}</p>
+                )}
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={wSaving}
+                    className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50"
+                  >
+                    {wSaving ? "Збереження..." : "Забрати кошти"}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {withdrawalsList.length > 0 ? (
+              <div className="divide-y divide-gray-100">
+                {withdrawalsList.map((w) => (
+                  <div key={w.id} className="flex items-center justify-between px-5 py-2.5">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                          {w.categoryName}
+                        </span>
+                        <span className="text-sm text-gray-500">{new Date(w.createdAt).toLocaleDateString("uk-UA")}</span>
+                      </div>
+                      {w.note && <p className="text-xs text-gray-400 mt-0.5 truncate">{w.note}</p>}
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-sm font-semibold text-purple-700">-{parseFloat(w.amount).toFixed(2)} ¥</span>
+                      <button
+                        onClick={() => handleDeleteWithdrawal(w.id)}
+                        className="text-red-400 hover:text-red-600 text-xs"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 px-5 py-4">Ще не забирали кошти за цей період</p>
+            )}
           </div>
 
           {/* Таблиця по замовленнях */}
