@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import type { Product } from "@/lib/schema";
 import { compressImage, formatFileSize } from "@/lib/compress";
@@ -19,18 +19,20 @@ export default function ProductsCatalog({
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
-  // Зберігаємо які постачальники розгорнуті (за замовчуванням всі)
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+
+  // Збираємо унікальних постачальників з усіх товарів
+  const allSuppliers = Array.from(
+    new Set(initialProducts.map((p) => p.supplier?.trim()).filter(Boolean) as string[])
+  ).sort((a, b) => a.localeCompare(b));
 
   const fetchProducts = useCallback(async (q: string) => {
     const res = await fetch(`/api/products${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     if (res.ok) {
       const data: Product[] = await res.json();
       setList(data);
-      // При пошуку розгортаємо всі групи
       if (q) {
-        const suppliers = new Set(data.map((p) => p.supplier ?? "Без постачальника"));
-        setOpenGroups(suppliers);
+        setOpenGroups(new Set(data.map((p) => p.supplier ?? "Без постачальника")));
       }
     }
   }, []);
@@ -40,7 +42,6 @@ export default function ProductsCatalog({
     return () => clearTimeout(timer);
   }, [search, fetchProducts]);
 
-  // Групуємо по постачальнику
   const grouped = list.reduce<Record<string, Product[]>>((acc, product) => {
     const key = product.supplier?.trim() || "Без постачальника";
     if (!acc[key]) acc[key] = [];
@@ -63,13 +64,8 @@ export default function ProductsCatalog({
     });
   }
 
-  function expandAll() {
-    setOpenGroups(new Set(supplierNames));
-  }
-
-  function collapseAll() {
-    setOpenGroups(new Set());
-  }
+  function expandAll() { setOpenGroups(new Set(supplierNames)); }
+  function collapseAll() { setOpenGroups(new Set()); }
 
   async function handleDelete(id: string) {
     if (!confirm("Видалити товар з каталогу?")) return;
@@ -85,12 +81,21 @@ export default function ProductsCatalog({
       if (exists) return prev.map((p) => (p.id === product.id ? product : p));
       return [product, ...prev];
     });
-    // Розгортаємо групу нового товару
     const supplier = product.supplier?.trim() || "Без постачальника";
     setOpenGroups((prev) => new Set([...prev, supplier]));
     setShowForm(false);
     setEditProduct(null);
   }
+
+  // Відкрити форму для конкретного постачальника
+  function handleAddToSupplier(supplierName: string) {
+    setEditProduct(null);
+    setShowForm(true);
+    // Передаємо постачальника через стан — форма підхопить
+    setPreselectedSupplier(supplierName === "Без постачальника" ? "" : supplierName);
+  }
+
+  const [preselectedSupplier, setPreselectedSupplier] = useState("");
 
   return (
     <div>
@@ -108,16 +113,16 @@ export default function ProductsCatalog({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
           </svg>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button onClick={expandAll} className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100 transition">
-            Розгорнути всі
+            Розгорнути
           </button>
           <button onClick={collapseAll} className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100 transition">
-            Згорнути всі
+            Згорнути
           </button>
           {canEdit && (
             <button
-              onClick={() => { setEditProduct(null); setShowForm(true); }}
+              onClick={() => { setEditProduct(null); setPreselectedSupplier(""); setShowForm(true); }}
               className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
             >
               + Новий товар
@@ -129,12 +134,14 @@ export default function ProductsCatalog({
       {showForm && (
         <ProductForm
           product={editProduct}
+          suppliers={allSuppliers}
+          preselectedSupplier={preselectedSupplier}
           onSaved={handleSaved}
           onCancel={() => { setShowForm(false); setEditProduct(null); }}
         />
       )}
 
-      {/* Акордеон по постачальнику */}
+      {/* Акордеон */}
       {list.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           {search ? "Нічого не знайдено" : "Каталог порожній — додайте перший товар"}
@@ -146,7 +153,6 @@ export default function ProductsCatalog({
             const isOpen = openGroups.has(supplier);
             return (
               <div key={supplier} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                {/* Заголовок групи */}
                 <button
                   onClick={() => toggleGroup(supplier)}
                   className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition text-left"
@@ -162,30 +168,32 @@ export default function ProductsCatalog({
                       <p className="text-xs text-gray-400">{products.length} {products.length === 1 ? "товар" : products.length < 5 ? "товари" : "товарів"}</p>
                     </div>
                   </div>
-                  <svg
-                    className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <div className="flex items-center gap-2">
+                    {canEdit && (
+                      <span
+                        onClick={(e) => { e.stopPropagation(); handleAddToSupplier(supplier); }}
+                        className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition cursor-pointer"
+                      >
+                        + Додати
+                      </span>
+                    )}
+                    <svg
+                      className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
                 </button>
 
-                {/* Товари */}
                 {isOpen && (
                   <div className="border-t border-gray-100 p-3">
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5">
                       {products.map((product) => (
                         <div key={product.id} className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden hover:shadow-sm transition">
-                          {/* Фото */}
                           <div className="relative aspect-square bg-gray-100">
                             {product.photoPath ? (
-                              <Image
-                                src={product.photoPath}
-                                alt={product.modelNumber}
-                                fill
-                                className="object-cover"
-                                unoptimized
-                              />
+                              <Image src={product.photoPath} alt={product.modelNumber} fill className="object-cover" unoptimized />
                             ) : (
                               <div className="flex items-center justify-center h-full text-gray-300">
                                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -194,35 +202,17 @@ export default function ProductsCatalog({
                               </div>
                             )}
                           </div>
-
-                          {/* Інфо */}
                           <div className="p-2">
                             <p className="font-mono text-xs font-semibold text-gray-800 truncate">{product.modelNumber}</p>
-                            {product.price && (
-                              <p className="text-xs font-medium text-green-700 mt-0.5">{product.price}</p>
-                            )}
-                            {product.note && (
-                              <p className="text-xs text-gray-400 truncate mt-0.5">{product.note}</p>
-                            )}
-
+                            {product.price && <p className="text-xs font-medium text-green-700 mt-0.5">{product.price}</p>}
+                            {product.note && <p className="text-xs text-gray-400 truncate mt-0.5">{product.note}</p>}
                             {(canEdit || canDelete) && (
                               <div className="flex gap-2 mt-2 pt-1.5 border-t border-gray-200">
                                 {canEdit && (
-                                  <button
-                                    onClick={() => { setEditProduct(product); setShowForm(true); }}
-                                    className="text-xs text-blue-600 hover:underline"
-                                  >
-                                    Ред.
-                                  </button>
+                                  <button onClick={() => { setEditProduct(product); setPreselectedSupplier(""); setShowForm(true); }} className="text-xs text-blue-600 hover:underline">Ред.</button>
                                 )}
                                 {canDelete && (
-                                  <button
-                                    onClick={() => handleDelete(product.id)}
-                                    disabled={loading}
-                                    className="text-xs text-red-500 hover:underline ml-auto"
-                                  >
-                                    Вид.
-                                  </button>
+                                  <button onClick={() => handleDelete(product.id)} disabled={loading} className="text-xs text-red-500 hover:underline ml-auto">Вид.</button>
                                 )}
                               </div>
                             )}
@@ -238,25 +228,29 @@ export default function ProductsCatalog({
         </div>
       )}
 
-      <p className="text-xs text-gray-400 mt-4">Всього товарів: {list.length} • Постачальників: {supplierNames.length}</p>
+      <p className="text-xs text-gray-400 mt-4">Всього товарів: {list.length} | Постачальників: {supplierNames.length}</p>
     </div>
   );
 }
 
 
-// ── Форма додавання/редагування ──────────────────────────────────────────────
+// ── Форма з випадаючим списком постачальників ────────────────────────────────
 
 function ProductForm({
   product,
+  suppliers,
+  preselectedSupplier,
   onSaved,
   onCancel,
 }: {
   product: Product | null;
+  suppliers: string[];
+  preselectedSupplier: string;
   onSaved: (p: Product) => void;
   onCancel: () => void;
 }) {
   const [modelNumber, setModelNumber] = useState(product?.modelNumber ?? "");
-  const [supplier, setSupplier] = useState(product?.supplier ?? "");
+  const [supplier, setSupplier] = useState(product?.supplier ?? preselectedSupplier ?? "");
   const [price, setPrice] = useState(product?.price ?? "");
   const [note, setNote] = useState(product?.note ?? "");
   const [photoPath, setPhotoPath] = useState(product?.photoPath ?? "");
@@ -265,8 +259,50 @@ function ProductForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Supplier dropdown
+  const [supplierOpen, setSupplierOpen] = useState(false);
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const supplierRef = useRef<HTMLDivElement>(null);
+
+  const filteredSuppliers = suppliers.filter((s) =>
+    s.toLowerCase().includes(supplierSearch.toLowerCase())
+  );
+
+  const isNewSupplier = supplierSearch.trim() && !suppliers.some(
+    (s) => s.toLowerCase() === supplierSearch.trim().toLowerCase()
+  );
+
+  // Закрити dropdown при кліку зовні
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (supplierRef.current && !supplierRef.current.contains(e.target as Node)) {
+        setSupplierOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function selectSupplier(name: string) {
+    setSupplier(name);
+    setSupplierSearch("");
+    setSupplierOpen(false);
+  }
+
+  function handleSupplierInputFocus() {
+    setSupplierOpen(true);
+    setSupplierSearch("");
+  }
+
+  function handleSupplierInputChange(val: string) {
+    setSupplierSearch(val);
+    setSupplier(val);
+    if (!supplierOpen) setSupplierOpen(true);
+  }
+
   async function handlePhoto(file: File) {
     setUploading(true);
+    setError("");
     try {
       const compressed = await compressImage(file);
       console.log(`Стиснуто: ${formatFileSize(file.size)} → ${formatFileSize(compressed.size)}`);
@@ -275,10 +311,11 @@ function ProductForm({
       fd.append("file", compressed);
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || "Помилка завантаження");
       setPhotoPath(data.path);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Помилка завантаження фото");
+      setPreviewUrl("");
     }
     setUploading(false);
   }
@@ -286,43 +323,58 @@ function ProductForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setSaving(true);
 
-    const body = { modelNumber, supplier, price, note, photoPath: photoPath || null };
-
-    const res = product
-      ? await fetch(`/api/products/${product.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        })
-      : await fetch("/api/products", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-
-    setSaving(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "Помилка збереження");
+    if (!modelNumber.trim()) {
+      setError("Номер моделі обов'язковий");
       return;
     }
 
-    const saved = await res.json();
-    onSaved(saved);
+    setSaving(true);
+
+    const body = {
+      modelNumber: modelNumber.trim(),
+      supplier: supplier.trim() || null,
+      price: price.trim() || null,
+      note: note.trim() || null,
+      photoPath: photoPath || null,
+    };
+
+    try {
+      const res = product
+        ? await fetch(`/api/products/${product.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          })
+        : await fetch("/api/products", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Помилка збереження");
+      }
+
+      const saved = await res.json();
+      onSaved(saved);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Помилка збереження");
+    }
+    setSaving(false);
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+    <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 mb-6">
       <h2 className="font-semibold text-gray-800 mb-4">
         {product ? "Редагувати товар" : "Новий товар"}
       </h2>
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {/* Фото */}
-        <div className="md:row-span-3 flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-2">
           <div
-            className="relative w-48 h-48 bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-blue-400 transition overflow-hidden"
+            className="relative w-40 h-40 sm:w-48 sm:h-48 bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-blue-400 transition overflow-hidden"
             onClick={() => document.getElementById("product-photo-input")?.click()}
           >
             {previewUrl ? (
@@ -348,67 +400,112 @@ function ProductForm({
             className="hidden"
             onChange={(e) => { if (e.target.files?.[0]) handlePhoto(e.target.files[0]); }}
           />
-          <p className="text-xs text-gray-400">Клікніть щоб змінити фото</p>
+          {previewUrl && (
+            <button type="button" onClick={() => { setPreviewUrl(""); setPhotoPath(""); }} className="text-xs text-red-500 hover:underline">
+              Видалити фото
+            </button>
+          )}
         </div>
 
         {/* Поля */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Номер моделі <span className="text-red-500">*</span>
-          </label>
-          <input
-            value={modelNumber}
-            onChange={(e) => setModelNumber(e.target.value)}
-            required
-            placeholder="ABC-12345"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
-          />
-        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Номер моделі <span className="text-red-500">*</span>
+            </label>
+            <input
+              value={modelNumber}
+              onChange={(e) => setModelNumber(e.target.value)}
+              required
+              placeholder="ABC-12345"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Постачальник</label>
-          <input
-            value={supplier}
-            onChange={(e) => setSupplier(e.target.value)}
-            placeholder="Назва постачальника"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-        </div>
+          {/* Постачальник з dropdown */}
+          <div ref={supplierRef} className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Постачальник</label>
+            <input
+              value={supplierOpen ? supplierSearch || supplier : supplier}
+              onChange={(e) => handleSupplierInputChange(e.target.value)}
+              onFocus={handleSupplierInputFocus}
+              placeholder="Обрати або ввести нового..."
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+            {supplier && !supplierOpen && (
+              <button
+                type="button"
+                onClick={() => { setSupplier(""); setSupplierSearch(""); }}
+                className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            )}
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Ціна</label>
-          <input
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            placeholder="150 ¥"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-        </div>
+            {supplierOpen && (
+              <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {filteredSuppliers.length > 0 ? (
+                  filteredSuppliers.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => selectSupplier(s)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition truncate"
+                    >
+                      {s}
+                    </button>
+                  ))
+                ) : (
+                  !isNewSupplier && <p className="px-3 py-2 text-xs text-gray-400">Немає постачальників</p>
+                )}
+                {isNewSupplier && (
+                  <button
+                    type="button"
+                    onClick={() => selectSupplier(supplierSearch.trim())}
+                    className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 transition border-t border-gray-100"
+                  >
+                    + Створити &quot;{supplierSearch.trim()}&quot;
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
-        <div className="md:col-span-1">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Нотатка</label>
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Додаткова інформація"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Ціна</label>
+            <input
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="150 ¥"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Нотатка</label>
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Додаткова інформація"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+          </div>
         </div>
 
         {error && (
-          <p className="md:col-span-2 text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+          <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>
         )}
 
-        <div className="md:col-span-2 flex gap-3 justify-end">
+        <div className="flex gap-3 justify-end pt-2">
           <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">
             Скасувати
           </button>
           <button
             type="submit"
             disabled={saving || uploading}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50"
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition"
           >
-            {saving ? "Збереження..." : "Зберегти"}
+            {saving ? "Збереження..." : uploading ? "Завантаження фото..." : "Зберегти"}
           </button>
         </div>
       </form>
