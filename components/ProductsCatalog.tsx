@@ -6,8 +6,22 @@ import type { Product, ProductPhoto } from "@/lib/schema";
 import { normalizeImageForUpload } from "@/lib/compress";
 import { uploadFile, type UploadResult } from "@/lib/upload-helper";
 
-// Товар з розпарсеним масивом фото
-type ProductItem = Omit<Product, "photoPaths"> & { photoPaths: ProductPhoto[] };
+// Товар з розпарсеним масивом фото та тегів
+type ProductItem = Omit<Product, "photoPaths" | "tags"> & {
+  photoPaths: ProductPhoto[];
+  tags: string[];
+};
+
+function parseTags(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map((t) => String(t).trim()).filter(Boolean);
+  if (typeof raw === "string") {
+    try {
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr.map((t) => String(t).trim()).filter(Boolean) : [];
+    } catch { /* ignore */ }
+  }
+  return [];
+}
 
 function normalizeProduct(p: Product | ProductItem): ProductItem {
   let photoPaths: ProductPhoto[] = [];
@@ -27,7 +41,8 @@ function normalizeProduct(p: Product | ProductItem): ProductItem {
   if (photoPaths.length === 0 && p.photoPath) {
     photoPaths = [{ url: p.photoPath, previewUrl: p.photoPath }];
   }
-  return { ...p, photoPaths } as ProductItem;
+  const tags = parseTags((p as unknown as { tags?: unknown }).tags);
+  return { ...p, photoPaths, tags } as ProductItem;
 }
 
 export default function ProductsCatalog({
@@ -131,7 +146,7 @@ export default function ProductsCatalog({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Пошук за моделлю, постачальником..."
+            placeholder="Пошук за моделлю, постачальником, хештегом..."
             className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -240,6 +255,20 @@ export default function ProductsCatalog({
                               <p className="font-mono text-xs font-semibold text-gray-800 truncate">{product.modelNumber}</p>
                               {product.price && <p className="text-xs font-medium text-green-700 mt-0.5">{product.price}</p>}
                               {product.note && <p className="text-xs text-gray-400 truncate mt-0.5">{product.note}</p>}
+                              {product.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {product.tags.map((tag) => (
+                                    <button
+                                      key={tag}
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); setSearch(tag); }}
+                                      className="text-[10px] text-blue-600 bg-blue-50 hover:bg-blue-100 px-1.5 py-0.5 rounded transition"
+                                    >
+                                      #{tag}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                               {(canEdit || canDelete) && (
                                 <div className="flex gap-2 mt-2 pt-1.5 border-t border-gray-200">
                                   {canEdit && (
@@ -295,6 +324,52 @@ function ProductForm({
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // ── Хештеги (теги) ──
+  const [tags, setTags] = useState<string[]>(() => (product ? product.tags ?? [] : []));
+  const [tagInput, setTagInput] = useState("");
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [tagOpen, setTagOpen] = useState(false);
+  const tagRef = useRef<HTMLDivElement>(null);
+
+  // Список наявних тегів з усіх товарів
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/products")
+      .then((r) => r.json())
+      .then((data: Product[]) => {
+        if (cancelled) return;
+        const t = Array.from(new Set(data.flatMap((p) => parseTags((p as unknown as { tags?: unknown }).tags)))) as string[];
+        setAllTags(t.sort((a, b) => a.localeCompare(b)));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // Закрити dropdown тегів при кліку зовні
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (tagRef.current && !tagRef.current.contains(e.target as Node)) {
+        setTagOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredTags = allTags.filter((t) => t.toLowerCase().includes(tagInput.toLowerCase()));
+
+  function addTag(raw: string) {
+    const v = raw.trim().toLowerCase().replace(/^#/, "");
+    if (!v) return;
+    setTags((prev) => (prev.includes(v) ? prev : [...prev, v]));
+    setTagInput("");
+    setTagOpen(false);
+  }
+
+  function removeTag(t: string) {
+    setTags((prev) => prev.filter((x) => x !== t));
+  }
 
   // Supplier dropdown
   const [supplierOpen, setSupplierOpen] = useState(false);
@@ -371,6 +446,7 @@ function ProductForm({
       note: note.trim() || null,
       photoPaths: photos,
       photoPath: photos[0]?.url ?? null,
+      tags,
     };
 
     try {
@@ -536,6 +612,69 @@ function ProductForm({
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             />
           </div>
+        </div>
+
+        {/* Хештеги */}
+        <div ref={tagRef} className="relative">
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Хештеги</label>
+
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {tags.map((t) => (
+                <span key={t} className="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                  #{t}
+                  <button type="button" onClick={() => removeTag(t)} className="text-blue-400 hover:text-red-500 transition text-xs leading-none">
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <input
+            value={tagInput}
+            onChange={(e) => { setTagInput(e.target.value); setTagOpen(true); }}
+            onFocus={() => setTagOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                addTag(tagInput);
+              } else if (e.key === "Backspace" && !tagInput && tags.length) {
+                removeTag(tags[tags.length - 1]);
+              }
+            }}
+            placeholder="Напр. штани, костюми, сукні... (Enter для додавання)"
+            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            autoComplete="off"
+          />
+
+          {tagOpen && (
+            <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              {filteredTags.length > 0 ? (
+                filteredTags.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => addTag(t)}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition truncate"
+                  >
+                    #{t}
+                  </button>
+                ))
+              ) : (
+                <p className="px-3 py-2 text-xs text-gray-400">Немає тегів</p>
+              )}
+              {tagInput.trim() && !allTags.some((t) => t === tagInput.trim().toLowerCase()) && (
+                <button
+                  type="button"
+                  onClick={() => addTag(tagInput)}
+                  className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 transition border-t border-gray-100"
+                >
+                  + Додати &quot;{tagInput.trim().toLowerCase().replace(/^#/, "")}&quot;
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {error && (

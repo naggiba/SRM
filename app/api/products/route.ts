@@ -6,13 +6,17 @@ import { products, Product, ProductPhoto } from "@/lib/schema";
 import { eq, like, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
-// Серіалізація фото — парсимо JSON-рядок photoPaths у масив
+// Серіалізація — парсимо JSON-рядки photoPaths та tags
 function serializeProduct(p: Product) {
   let photoPaths: ProductPhoto[] = [];
   if (p.photoPaths) {
     try { photoPaths = JSON.parse(p.photoPaths); } catch { photoPaths = []; }
   }
-  return { ...p, photoPaths };
+  let tags: string[] = [];
+  if (p.tags) {
+    try { tags = JSON.parse(p.tags); } catch { tags = []; }
+  }
+  return { ...p, photoPaths, tags };
 }
 
 // Головне фото = перший елемент масиву
@@ -25,14 +29,15 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
 
-  const q = req.nextUrl.searchParams.get("q") ?? "";
+  const q = (req.nextUrl.searchParams.get("q") ?? "").trim().replace(/^#/, "");
 
   let list: Product[];
   if (q) {
     list = await db.select().from(products).where(
       or(
         like(products.modelNumber, `%${q}%`),
-        like(products.supplier, `%${q}%`)
+        like(products.supplier, `%${q}%`),
+        like(products.tags, `%${q}%`)
       )
     );
   } else {
@@ -51,7 +56,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { modelNumber, photoPath, photoPaths, supplier, price, note } = body;
+  const { modelNumber, photoPath, photoPaths, supplier, price, note, tags } = body;
 
   if (!modelNumber?.trim()) {
     return NextResponse.json({ error: "Номер моделі обов'язковий" }, { status: 400 });
@@ -63,6 +68,7 @@ export async function POST(req: NextRequest) {
     ? JSON.stringify(photoPaths)
     : null;
   const mainPhotoUrl = mainPhoto(photoPaths) || photoPath || null;
+  const tagsJson = Array.isArray(tags) && tags.length > 0 ? JSON.stringify(tags.map((t: string) => t.trim()).filter(Boolean)) : null;
 
   // Перевіряємо чи вже існує така модель
   const [existing] = await db.select().from(products)
@@ -70,12 +76,13 @@ export async function POST(req: NextRequest) {
     .limit(1);
 
   if (existing) {
-    // Оновлюємо якщо є нові дані (фото, ціна)
+    // Оновлюємо якщо є нові дані (фото, ціна, теги)
     const updateData: Partial<Product> = { updatedAt: now };
     if (Array.isArray(photoPaths)) {
       updateData.photoPaths = photoPathsJson;
       updateData.photoPath = mainPhotoUrl;
     }
+    if (Array.isArray(tags)) updateData.tags = tagsJson;
     if (price && price !== existing.price) updateData.price = price;
     if (supplier && supplier !== existing.supplier) updateData.supplier = supplier;
     if (note) updateData.note = note;
@@ -95,6 +102,7 @@ export async function POST(req: NextRequest) {
     supplier: supplier?.trim() ?? null,
     price: price?.trim() ?? null,
     note: note?.trim() ?? null,
+    tags: tagsJson,
     createdAt: now,
     updatedAt: now,
   });

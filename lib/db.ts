@@ -52,6 +52,7 @@ if (useTurso) {
   const productCols = sqlite.prepare("PRAGMA table_info(products)").all() as { name: string }[];
   const productColNames = productCols.map((c: { name: string }) => c.name);
   if (!productColNames.includes("photo_paths")) sqlite.exec("ALTER TABLE products ADD COLUMN photo_paths TEXT");
+  if (!productColNames.includes("tags")) sqlite.exec("ALTER TABLE products ADD COLUMN tags TEXT");
 }
 
 export { db };

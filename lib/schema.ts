@@ -101,6 +101,7 @@ export const products = sqliteTable("products", {
   supplier: text("supplier"),
   price: text("price"),
   note: text("note"),
+  tags: text("tags"),                        // JSON: ["штани", "костюми", ...]
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

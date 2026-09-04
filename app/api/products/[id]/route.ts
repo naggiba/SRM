@@ -10,7 +10,11 @@ function serializeProduct(p: Product) {
   if (p.photoPaths) {
     try { photoPaths = JSON.parse(p.photoPaths); } catch { photoPaths = []; }
   }
-  return { ...p, photoPaths };
+  let tags: string[] = [];
+  if (p.tags) {
+    try { tags = JSON.parse(p.tags); } catch { tags = []; }
+  }
+  return { ...p, photoPaths, tags };
 }
 
 // PATCH /api/products/[id] — оновити товар
@@ -23,7 +27,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const body = await req.json();
-  const { modelNumber, photoPath, photoPaths, supplier, price, note } = body;
+  const { modelNumber, photoPath, photoPaths, supplier, price, note, tags } = body;
 
   await db.update(products).set({
     ...(modelNumber && { modelNumber: modelNumber.trim() }),
@@ -35,6 +39,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     ...(supplier !== undefined && { supplier: supplier?.trim() ?? null }),
     ...(price !== undefined && { price: price?.trim() ?? null }),
     ...(note !== undefined && { note: note?.trim() ?? null }),
+    ...(tags !== undefined && {
+      tags: Array.isArray(tags) && tags.length > 0 ? JSON.stringify(tags.map((t: string) => t.trim()).filter(Boolean)) : null,
+    }),
     updatedAt: new Date().toISOString(),
   }).where(eq(products.id, id));
 

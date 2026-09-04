@@ -18,6 +18,40 @@ export default function ProductAutocomplete({ modelNumber, supplier, price, onSe
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // ── Список постачальників (як у каталозі) ──
+  const [suppliers, setSuppliers] = useState<string[]>([]);
+  const [supplierOpen, setSupplierOpen] = useState(false);
+  const [supplierQuery, setSupplierQuery] = useState("");
+  const supplierRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/products")
+      .then((r) => r.json())
+      .then((data: Product[]) => {
+        if (cancelled) return;
+        const s = Array.from(new Set(data.map((p) => p.supplier?.trim()).filter(Boolean))) as string[];
+        setSuppliers(s.sort((a, b) => a.localeCompare(b)));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const filteredSuppliers = suppliers.filter((s) =>
+    s.toLowerCase().includes(supplierQuery.toLowerCase())
+  );
+
+  // Закриваємо dropdown постачальника при кліку зовні
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (supplierRef.current && !supplierRef.current.contains(e.target as Node)) {
+        setSupplierOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // Пошук при введенні номера моделі
   useEffect(() => {
     if (!modelNumber || modelNumber.length < 1) {
@@ -40,7 +74,7 @@ export default function ProductAutocomplete({ modelNumber, supplier, price, onSe
     return () => clearTimeout(timer);
   }, [modelNumber]);
 
-  // Закриваємо при кліку зовні
+  // Закриваємо при кліку зовні (для підказок моделі)
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -63,13 +97,62 @@ export default function ProductAutocomplete({ modelNumber, supplier, price, onSe
 
   return (
     <div className="grid grid-cols-2 gap-3" ref={containerRef}>
-      {/* Постачальник */}
-      <input
-        value={supplier}
-        onChange={(e) => onChange("supplier", e.target.value)}
-        placeholder="Постачальник"
-        className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm"
-      />
+      {/* Постачальник з dropdown */}
+      <div className="relative" ref={supplierRef}>
+        <input
+          value={supplierOpen ? supplierQuery || supplier : supplier}
+          onChange={(e) => {
+            setSupplierQuery(e.target.value);
+            onChange("supplier", e.target.value);
+            setSupplierOpen(true);
+          }}
+          onFocus={() => { setSupplierOpen(true); setSupplierQuery(""); }}
+          placeholder="Постачальник"
+          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm"
+          autoComplete="off"
+        />
+        {supplier && !supplierOpen && (
+          <button
+            type="button"
+            onClick={() => { onChange("supplier", ""); setSupplierQuery(""); }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+          >
+            ✕
+          </button>
+        )}
+
+        {supplierOpen && (
+          <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-auto max-h-48">
+            {filteredSuppliers.length > 0 ? (
+              filteredSuppliers.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => { onChange("supplier", s); setSupplierQuery(""); setSupplierOpen(false); }}
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition truncate"
+                >
+                  {s}
+                </button>
+              ))
+            ) : (
+              <p className="px-3 py-2 text-xs text-gray-400">Немає постачальників</p>
+            )}
+            {supplierQuery.trim() && !suppliers.some((s) => s.toLowerCase() === supplierQuery.trim().toLowerCase()) && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange("supplier", supplierQuery.trim());
+                  setSupplierQuery("");
+                  setSupplierOpen(false);
+                }}
+                className="w-full text-left px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 transition border-t border-gray-100"
+              >
+                + Створити &quot;{supplierQuery.trim()}&quot;
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Номер моделі з автодоповненням */}
       <div className="relative">
