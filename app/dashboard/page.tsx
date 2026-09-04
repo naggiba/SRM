@@ -69,6 +69,7 @@ export default async function DashboardPage() {
           <NavCard href="/clients" title="Клієнти" desc="Пошук, додавання" compact icon="clients" />
           <NavCard href="/finance" title="Фінанси" desc="Підсумок, прибутки" compact icon="finance" />
           <NavCard href="/analytics" title="Аналітика" desc="Метрики, статуси" compact icon="analytics" />
+          <NavCard href="/notes" title="Нотатки" desc="Блокнот, нотатки" compact icon="notes" />
           {role === "ADMIN" && (
             <NavCard href="/admin/users" title="Користувачі" desc="Акаунти, ролі" compact icon="users" />
           )}
@@ -101,6 +102,8 @@ function CardIcon({ name, className }: { name: string; className: string }) {
       return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>;
     case "users":
       return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
+    case "notes":
+      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>;
     default:
       return null;
   }

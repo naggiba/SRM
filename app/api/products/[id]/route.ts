@@ -2,8 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { products } from "@/lib/schema";
+import { products, Product, ProductPhoto } from "@/lib/schema";
 import { eq } from "drizzle-orm";
+
+function serializeProduct(p: Product) {
+  let photoPaths: ProductPhoto[] = [];
+  if (p.photoPaths) {
+    try { photoPaths = JSON.parse(p.photoPaths); } catch { photoPaths = []; }
+  }
+  return { ...p, photoPaths };
+}
 
 // PATCH /api/products/[id] — оновити товар
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -15,11 +23,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const body = await req.json();
-  const { modelNumber, photoPath, supplier, price, note } = body;
+  const { modelNumber, photoPath, photoPaths, supplier, price, note } = body;
 
   await db.update(products).set({
     ...(modelNumber && { modelNumber: modelNumber.trim() }),
     ...(photoPath !== undefined && { photoPath }),
+    ...(photoPaths !== undefined && {
+      photoPaths: Array.isArray(photoPaths) && photoPaths.length > 0 ? JSON.stringify(photoPaths) : null,
+      photoPath: Array.isArray(photoPaths) && photoPaths.length > 0 ? photoPaths[0].url : null,
+    }),
     ...(supplier !== undefined && { supplier: supplier?.trim() ?? null }),
     ...(price !== undefined && { price: price?.trim() ?? null }),
     ...(note !== undefined && { note: note?.trim() ?? null }),
@@ -29,7 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const [updated] = await db.select().from(products).where(eq(products.id, id));
   if (!updated) return NextResponse.json({ error: "Не знайдено" }, { status: 404 });
 
-  return NextResponse.json(updated);
+  return NextResponse.json(serializeProduct(updated));
 }
 
 // DELETE /api/products/[id] — видалити товар

@@ -2,8 +2,33 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
-import type { Product } from "@/lib/schema";
-import { compressImage, formatFileSize } from "@/lib/compress";
+import type { Product, ProductPhoto } from "@/lib/schema";
+import { normalizeImageForUpload } from "@/lib/compress";
+import { uploadFile, type UploadResult } from "@/lib/upload-helper";
+
+// Товар з розпарсеним масивом фото
+type ProductItem = Omit<Product, "photoPaths"> & { photoPaths: ProductPhoto[] };
+
+function normalizeProduct(p: Product | ProductItem): ProductItem {
+  let photoPaths: ProductPhoto[] = [];
+  const raw = (p as unknown as { photoPaths?: unknown }).photoPaths;
+  if (Array.isArray(raw)) {
+    photoPaths = raw.map((x) => ({
+      url: (x as ProductPhoto).url ?? (x as string),
+      previewUrl: (x as ProductPhoto).previewUrl ?? (x as ProductPhoto).url ?? (x as string),
+    }));
+  } else if (typeof raw === "string") {
+    try {
+      const arr = JSON.parse(raw);
+      photoPaths = Array.isArray(arr) ? arr : [];
+    } catch { /* ignore */ }
+  }
+  // Legacy: якщо є лише photoPath, показуємо його як єдине фото
+  if (photoPaths.length === 0 && p.photoPath) {
+    photoPaths = [{ url: p.photoPath, previewUrl: p.photoPath }];
+  }
+  return { ...p, photoPaths } as ProductItem;
+}
 
 export default function ProductsCatalog({
   initialProducts,
@@ -14,10 +39,10 @@ export default function ProductsCatalog({
   canEdit: boolean;
   canDelete: boolean;
 }) {
-  const [list, setList] = useState<Product[]>(initialProducts);
+  const [list, setList] = useState<ProductItem[]>(initialProducts.map(normalizeProduct));
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [editProduct, setEditProduct] = useState<ProductItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
@@ -30,7 +55,7 @@ export default function ProductsCatalog({
     const res = await fetch(`/api/products${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     if (res.ok) {
       const data: Product[] = await res.json();
-      setList(data);
+      setList(data.map(normalizeProduct));
       if (q) {
         setOpenGroups(new Set(data.map((p) => p.supplier ?? "Без постачальника")));
       }
@@ -42,7 +67,7 @@ export default function ProductsCatalog({
     return () => clearTimeout(timer);
   }, [search, fetchProducts]);
 
-  const grouped = list.reduce<Record<string, Product[]>>((acc, product) => {
+  const grouped = list.reduce<Record<string, ProductItem[]>>((acc, product) => {
     const key = product.supplier?.trim() || "Без постачальника";
     if (!acc[key]) acc[key] = [];
     acc[key].push(product);
@@ -75,7 +100,7 @@ export default function ProductsCatalog({
     setLoading(false);
   }
 
-  function handleSaved(product: Product) {
+  function handleSaved(product: ProductItem) {
     setList((prev) => {
       const exists = prev.find((p) => p.id === product.id);
       if (exists) return prev.map((p) => (p.id === product.id ? product : p));
@@ -189,36 +214,46 @@ export default function ProductsCatalog({
                 {isOpen && (
                   <div className="border-t border-gray-100 p-3">
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5">
-                      {products.map((product) => (
-                        <div key={product.id} className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden hover:shadow-sm transition">
-                          <div className="relative aspect-square bg-gray-100">
-                            {product.photoPath ? (
-                              <Image src={product.photoPath} alt={product.modelNumber} fill className="object-cover" unoptimized />
-                            ) : (
-                              <div className="flex items-center justify-center h-full text-gray-300">
-                                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                              </div>
-                            )}
+                      {products.map((product) => {
+                        const photo = product.photoPaths[0];
+                        const mainSrc = photo?.previewUrl || product.photoPath || "";
+                        const count = product.photoPaths.length || (product.photoPath ? 1 : 0);
+                        return (
+                          <div key={product.id} className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden hover:shadow-sm transition">
+                            <div className="relative aspect-square bg-gray-100">
+                              {mainSrc ? (
+                                <Image src={mainSrc} alt={product.modelNumber} fill className="object-cover" unoptimized />
+                              ) : (
+                                <div className="flex items-center justify-center h-full text-gray-300">
+                                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                </div>
+                              )}
+                              {count > 1 && (
+                                <span className="absolute top-1 right-1 bg-black/60 text-white text-[10px] leading-none px-1.5 py-0.5 rounded">
+                                  ×{count}
+                                </span>
+                              )}
+                            </div>
+                            <div className="p-2">
+                              <p className="font-mono text-xs font-semibold text-gray-800 truncate">{product.modelNumber}</p>
+                              {product.price && <p className="text-xs font-medium text-green-700 mt-0.5">{product.price}</p>}
+                              {product.note && <p className="text-xs text-gray-400 truncate mt-0.5">{product.note}</p>}
+                              {(canEdit || canDelete) && (
+                                <div className="flex gap-2 mt-2 pt-1.5 border-t border-gray-200">
+                                  {canEdit && (
+                                    <button onClick={() => { setEditProduct(product); setPreselectedSupplier(""); setShowForm(true); }} className="text-xs text-blue-600 hover:underline">Ред.</button>
+                                  )}
+                                  {canDelete && (
+                                    <button onClick={() => handleDelete(product.id)} disabled={loading} className="text-xs text-red-500 hover:underline ml-auto">Вид.</button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div className="p-2">
-                            <p className="font-mono text-xs font-semibold text-gray-800 truncate">{product.modelNumber}</p>
-                            {product.price && <p className="text-xs font-medium text-green-700 mt-0.5">{product.price}</p>}
-                            {product.note && <p className="text-xs text-gray-400 truncate mt-0.5">{product.note}</p>}
-                            {(canEdit || canDelete) && (
-                              <div className="flex gap-2 mt-2 pt-1.5 border-t border-gray-200">
-                                {canEdit && (
-                                  <button onClick={() => { setEditProduct(product); setPreselectedSupplier(""); setShowForm(true); }} className="text-xs text-blue-600 hover:underline">Ред.</button>
-                                )}
-                                {canDelete && (
-                                  <button onClick={() => handleDelete(product.id)} disabled={loading} className="text-xs text-red-500 hover:underline ml-auto">Вид.</button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -243,18 +278,20 @@ function ProductForm({
   onSaved,
   onCancel,
 }: {
-  product: Product | null;
+  product: ProductItem | null;
   suppliers: string[];
   preselectedSupplier: string;
-  onSaved: (p: Product) => void;
+  onSaved: (p: ProductItem) => void;
   onCancel: () => void;
 }) {
   const [modelNumber, setModelNumber] = useState(product?.modelNumber ?? "");
   const [supplier, setSupplier] = useState(product?.supplier ?? preselectedSupplier ?? "");
   const [price, setPrice] = useState(product?.price ?? "");
   const [note, setNote] = useState(product?.note ?? "");
-  const [photoPath, setPhotoPath] = useState(product?.photoPath ?? "");
-  const [previewUrl, setPreviewUrl] = useState(product?.photoPath ?? "");
+  const [photos, setPhotos] = useState<ProductPhoto[]>(() => {
+    if (!product) return [];
+    return normalizeProduct(product).photoPaths;
+  });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -300,22 +337,18 @@ function ProductForm({
     if (!supplierOpen) setSupplierOpen(true);
   }
 
-  async function handlePhoto(file: File) {
+  async function handlePhotos(files: FileList) {
+    if (!files.length) return;
     setUploading(true);
     setError("");
     try {
-      const compressed = await compressImage(file);
-      console.log(`Стиснуто: ${formatFileSize(file.size)} → ${formatFileSize(compressed.size)}`);
-      setPreviewUrl(URL.createObjectURL(compressed));
-      const fd = new FormData();
-      fd.append("file", compressed);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Помилка завантаження");
-      setPhotoPath(data.path);
+      for (const file of Array.from(files)) {
+        const original = await normalizeImageForUpload(file);
+        const result: UploadResult = await uploadFile(original);
+        setPhotos((prev) => [...prev, { url: result.originalUrl, previewUrl: result.previewUrl }]);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Помилка завантаження фото");
-      setPreviewUrl("");
     }
     setUploading(false);
   }
@@ -336,7 +369,8 @@ function ProductForm({
       supplier: supplier.trim() || null,
       price: price.trim() || null,
       note: note.trim() || null,
-      photoPath: photoPath || null,
+      photoPaths: photos,
+      photoPath: photos[0]?.url ?? null,
     };
 
     try {
@@ -371,39 +405,48 @@ function ProductForm({
         {product ? "Редагувати товар" : "Новий товар"}
       </h2>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Фото */}
-        <div className="flex flex-col items-center gap-2">
-          <div
-            className="relative w-40 h-40 sm:w-48 sm:h-48 bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-blue-400 transition overflow-hidden"
-            onClick={() => document.getElementById("product-photo-input")?.click()}
-          >
-            {previewUrl ? (
-              <Image src={previewUrl} alt="preview" fill className="object-cover" unoptimized />
-            ) : (
-              <div className="text-center text-gray-400 text-sm p-4">
-                <svg className="w-10 h-10 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {/* Фото (галерея) */}
+        <div>
+          <div className="flex flex-wrap gap-2.5">
+            {photos.map((photo, i) => (
+              <div key={i} className="relative w-24 h-24">
+                <Image src={photo.previewUrl} alt={`Фото ${i + 1}`} fill className="object-cover rounded-lg border border-gray-200" unoptimized />
+                <button
+                  type="button"
+                  onClick={() => setPhotos((prev) => prev.filter((_, idx) => idx !== i))}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs leading-none flex items-center justify-center shadow"
+                  title="Видалити фото"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => document.getElementById("product-photos-input")?.click()}
+              disabled={uploading}
+              className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 hover:border-blue-400 hover:text-blue-500 transition disabled:opacity-50"
+              title="Додати фото"
+            >
+              {uploading ? (
+                <span className="text-xs text-gray-500">Завантаження...</span>
+              ) : (
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                 </svg>
-                Додати фото
-              </div>
-            )}
-            {uploading && (
-              <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-                <span className="text-sm text-gray-500">Завантаження...</span>
-              </div>
-            )}
+              )}
+            </button>
           </div>
           <input
-            id="product-photo-input"
+            id="product-photos-input"
             type="file"
             accept="image/*"
+            multiple
             className="hidden"
-            onChange={(e) => { if (e.target.files?.[0]) handlePhoto(e.target.files[0]); }}
+            onChange={(e) => { if (e.target.files?.length) handlePhotos(e.target.files); }}
           />
-          {previewUrl && (
-            <button type="button" onClick={() => { setPreviewUrl(""); setPhotoPath(""); }} className="text-xs text-red-500 hover:underline">
-              Видалити фото
-            </button>
+          {photos.length === 0 && (
+            <p className="text-xs text-gray-400 mt-2">Додайте одне або кілька фото товару.</p>
           )}
         </div>
 

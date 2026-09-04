@@ -1,11 +1,22 @@
 import type { NextConfig } from "next";
 
+// Парсимо кастомний публічний домен R2 (якщо валідний)
+function getR2Hostname(): string | null {
+  const url = process.env.S3_PUBLIC_URL;
+  if (!url) return null;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
 const nextConfig: NextConfig = {
   // Виключаємо better-sqlite3 з серверного бандлу на Vercel
   serverExternalPackages: ["better-sqlite3"],
 
   images: {
-    // Дозволяємо зображення з Uploadthing та локальних uploads
+    // Дозволяємо зображення з Uploadthing та Cloudflare R2
     remotePatterns: [
       {
         protocol: "https",
@@ -15,6 +26,17 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "uploadthing.com",
       },
+      {
+        protocol: "https",
+        hostname: "*.r2.dev",
+      },
+      // Кастомний публічний домен R2 (якщо задано S3_PUBLIC_URL)
+      ...(getR2Hostname()
+        ? [{
+            protocol: "https" as const,
+            hostname: getR2Hostname()!,
+          }]
+        : []),
     ],
     // Мінімальний TTL кешу зображень — 1 день
     minimumCacheTTL: 86400,

@@ -36,6 +36,7 @@ if (useTurso) {
   sqlite.exec(`CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, model_number TEXT NOT NULL UNIQUE, photo_path TEXT, supplier TEXT, price TEXT, note TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
   sqlite.exec(`CREATE TABLE IF NOT EXISTS withdrawal_categories (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL)`);
   sqlite.exec(`CREATE TABLE IF NOT EXISTS withdrawals (id TEXT PRIMARY KEY, category_id TEXT, category_name TEXT NOT NULL, amount TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL, created_by TEXT NOT NULL)`);
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT, photos TEXT, pinned INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, created_by TEXT NOT NULL)`);
 
   // Migrations
   const paymentCols = sqlite.prepare("PRAGMA table_info(payments)").all() as { name: string }[];
@@ -46,6 +47,11 @@ if (useTurso) {
   const orderCols = sqlite.prepare("PRAGMA table_info(orders)").all() as { name: string }[];
   const orderColNames = orderCols.map((c: { name: string }) => c.name);
   if (!orderColNames.includes("supplier_total")) sqlite.exec("ALTER TABLE orders ADD COLUMN supplier_total TEXT");
+
+  // Products — підтримка кількох фото
+  const productCols = sqlite.prepare("PRAGMA table_info(products)").all() as { name: string }[];
+  const productColNames = productCols.map((c: { name: string }) => c.name);
+  if (!productColNames.includes("photo_paths")) sqlite.exec("ALTER TABLE products ADD COLUMN photo_paths TEXT");
 }
 
 export { db };

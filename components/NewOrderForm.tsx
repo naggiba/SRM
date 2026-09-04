@@ -8,7 +8,7 @@ import ProductAutocomplete from "@/components/ProductAutocomplete";
 
 interface ColorQty {
   color: string;
-  qty: number;
+  qty: number | string; // "" — ще не введено; число — введена кількість
 }
 
 interface ItemDraft {
@@ -151,7 +151,7 @@ export default function NewOrderForm({ clients }: { clients: ClientOption[] }) {
     setItems((prev) =>
       prev.map((it) =>
         it.localId === localId
-          ? { ...it, colors: [...it.colors, { color: "", qty: 1 }] }
+          ? { ...it, colors: [...it.colors, { color: "", qty: "" }] }
           : it
       )
     );
@@ -209,7 +209,7 @@ export default function NewOrderForm({ clients }: { clients: ClientOption[] }) {
           supplier,
           modelNumber,
           price,
-          colors,
+          colors: colors.map((c) => ({ color: c.color, qty: c.qty === "" ? 0 : Number(c.qty) })),
         })),
       }),
     });
@@ -258,7 +258,7 @@ export default function NewOrderForm({ clients }: { clients: ClientOption[] }) {
   // ── Auto-calculate total from items ──
   const calculatedTotal = items.reduce((sum, item) => {
     const price = parseFloat(item.price) || 0;
-    const totalQty = item.colors.reduce((q, c) => q + (c.qty || 0), 0) || 1;
+    const totalQty = item.colors.reduce((q, c) => q + (Number(c.qty) || 0), 0) || 1;
     return sum + (price * totalQty);
   }, 0);
 
@@ -497,7 +497,7 @@ export default function NewOrderForm({ clients }: { clients: ClientOption[] }) {
                               <input
                                 type="number"
                                 value={c.qty}
-                                onChange={(e) => updateColor(item.localId, ci, "qty", parseInt(e.target.value) || 0)}
+                                onChange={(e) => updateColor(item.localId, ci, "qty", e.target.value === "" ? "" : Number(e.target.value))}
                                 className="w-12 px-1.5 py-0.5 border border-gray-300 rounded text-xs text-center"
                                 min="0"
                               />

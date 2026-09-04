@@ -96,7 +96,8 @@ export type ExtraExpense = typeof extraExpenses.$inferSelect;
 export const products = sqliteTable("products", {
   id: text("id").primaryKey(),
   modelNumber: text("model_number").notNull().unique(), // унікальний номер моделі
-  photoPath: text("photo_path"),
+  photoPath: text("photo_path"),             // головне фото (для сумісності)
+  photoPaths: text("photo_paths"),           // JSON: [{ url, previewUrl }, ...]
   supplier: text("supplier"),
   price: text("price"),
   note: text("note"),
@@ -106,6 +107,12 @@ export const products = sqliteTable("products", {
 
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
+
+// Фото товару
+export interface ProductPhoto {
+  url: string;        // оригінал — повноякісний
+  previewUrl: string; // стиснений preview для UI
+}
 
 // ── Withdrawals (виплати — вивід зароблених коштів) ──────────────────────────
 
@@ -127,6 +134,22 @@ export const withdrawals = sqliteTable("withdrawals", {
 
 export type WithdrawalCategory = typeof withdrawalCategories.$inferSelect;
 export type Withdrawal = typeof withdrawals.$inferSelect;
+
+// ── Notes (нотатки / блокнот) ────────────────────────────────────────────────
+
+export const notes = sqliteTable("notes", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content"),
+  photos: text("photos"),              // JSON: ["url1", "url2", ...]
+  pinned: integer("pinned").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  createdBy: text("created_by").notNull(),
+});
+
+export type Note = typeof notes.$inferSelect;
+export type NewNote = typeof notes.$inferInsert;
 
 // Типи для кольорів
 export interface ColorQty {
