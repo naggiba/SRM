@@ -306,6 +306,7 @@ function NoteCard({
     input.onchange = async (e: Event) => {
       const target = e.target as HTMLInputElement;
       const file = target.files?.[0];
+      input.value = ""; // iOS: скидаємо, щоб можна було обрати наступне фото
       if (!file) return;
       setUploading(true);
       setUploadError("");
@@ -485,6 +486,7 @@ function NoteForm({
     input.onchange = async (e: Event) => {
       const target = e.target as HTMLInputElement;
       const file = target.files?.[0];
+      input.value = ""; // iOS: скидаємо, щоб можна було обрати наступне фото
       if (!file) return;
       setUploading(true);
       try {

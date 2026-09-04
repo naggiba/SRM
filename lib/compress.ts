@@ -14,16 +14,55 @@ const DEFAULT_OPTIONS: CompressionOptions = {
 
 const HEIC_TYPES = ["image/heic", "image/heif"];
 
-// Конвертує HEIC/HEIF у JPEG за допомогою heic2any (тільки в браузері)
+// HEIC визначаємо і за типом, і за розширенням — iOS інколи не передає file.type
+function isHeicFile(file: File): boolean {
+  if (HEIC_TYPES.includes(file.type)) return true;
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  return ext === "heic" || ext === "heif";
+}
+
+// Конвертує HEIC/HEIF у JPEG — кілька стратегій, щоб гарантовано працювати
+// на iPhone (де фото у HEIC/HEVC, які sharp на сервері не завжди декодує).
 async function convertHeicToJpeg(file: File): Promise<File> {
-  const heic2any = (await import("heic2any")).default;
-  const result = await heic2any({
-    blob: file,
-    toType: "image/jpeg",
-    quality: 0.8,
-  });
-  const blob = Array.isArray(result) ? result[0] : result;
-  return new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+  const jpgName = file.name.replace(/\.[^.]+$/, ".jpg");
+
+  // 1) heic2any (WASM)
+  try {
+    const heic2any = (await import("heic2any")).default;
+    const result = await heic2any({
+      blob: file,
+      toType: "image/jpeg",
+      quality: 0.85,
+    });
+    const blob = Array.isArray(result) ? result[0] : result;
+    return new File([blob], jpgName, { type: "image/jpeg" });
+  } catch (e) {
+    console.warn("heic2any failed, fallback to canvas:", e);
+  }
+
+  // 2) Декодування через <img> + canvas (iOS вміє показувати HEIC)
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("Не вдалося декодувати зображення"));
+      i.src = url;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+    canvas.getContext("2d")?.drawImage(img, 0, 0);
+    const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.85));
+    if (blob) return new File([blob], jpgName, { type: "image/jpeg" });
+  } catch (e) {
+    console.warn("canvas decode failed:", e);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+
+  // 3) Якщо нічого не вийшло — повертаємо оригінал, сервер спробує сам
+  return file;
 }
 
 export async function compressImage(
@@ -34,7 +73,7 @@ export async function compressImage(
 
   try {
     // HEIC/HEIF не декодуються у canvas на iOS — конвертуємо у JPEG спочатку
-    if (HEIC_TYPES.includes(file.type)) {
+    if (isHeicFile(file)) {
       file = await convertHeicToJpeg(file);
     }
   } catch (error) {
@@ -70,7 +109,7 @@ export async function compressImage(
 // БЕЗ зменшення роздільності — оригінал залишається повноякісним.
 export async function normalizeImageForUpload(file: File): Promise<File> {
   try {
-    if (HEIC_TYPES.includes(file.type)) {
+    if (isHeicFile(file)) {
       return await convertHeicToJpeg(file);
     }
     return file;

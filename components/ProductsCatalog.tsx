@@ -443,7 +443,10 @@ function ProductForm({
             accept="image/*"
             multiple
             className="hidden"
-            onChange={(e) => { if (e.target.files?.length) handlePhotos(e.target.files); }}
+            onChange={(e) => {
+              if (e.target.files?.length) handlePhotos(e.target.files);
+              e.target.value = ""; // iOS: скидаємо, щоб можна було обрати наступне фото
+            }}
           />
           {photos.length === 0 && (
             <p className="text-xs text-gray-400 mt-2">Додайте одне або кілька фото товару.</p>
