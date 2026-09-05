@@ -13,12 +13,13 @@ interface Props {
 }
 
 export default function ProductAutocomplete({ modelNumber, supplier, price, onSelect, onChange }: Props) {
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [suggestions, setSuggestions] = useState<Product[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [modelOpen, setModelOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // ── Список постачальників (як у каталозі) ──
+  // ── Список постачальників та товарів з каталогу ──
   const [suppliers, setSuppliers] = useState<string[]>([]);
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [supplierQuery, setSupplierQuery] = useState("");
@@ -30,6 +31,7 @@ export default function ProductAutocomplete({ modelNumber, supplier, price, onSe
       .then((r) => r.json())
       .then((data: Product[]) => {
         if (cancelled) return;
+        setAllProducts(data);
         const s = Array.from(new Set(data.map((p) => p.supplier?.trim()).filter(Boolean))) as string[];
         setSuppliers(s.sort((a, b) => a.localeCompare(b)));
       })
@@ -52,8 +54,16 @@ export default function ProductAutocomplete({ modelNumber, supplier, price, onSe
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Пошук при введенні номера моделі
+  // Моделі обраного постачальника з каталогу (клієнтська фільтрація)
+  const supplierNorm = (supplier.trim() || "Без постачальника").toLowerCase();
+  const modelQuery = modelNumber.trim().toLowerCase();
+  const supplierModels = allProducts
+    .filter((p) => (p.supplier?.trim() || "Без постачальника").toLowerCase() === supplierNorm)
+    .filter((p) => !modelQuery || p.modelNumber.toLowerCase().includes(modelQuery));
+
+  // Пошук по API — лише коли постачальник не обраний
   useEffect(() => {
+    if (supplier) return; // при обраному постачальнику фільтруємо клієнтськи
     if (!modelNumber || modelNumber.length < 1) {
       const timer = setTimeout(() => setSuggestions([]), 0);
       return () => clearTimeout(timer);
@@ -64,21 +74,24 @@ export default function ProductAutocomplete({ modelNumber, supplier, price, onSe
         const res = await fetch(`/api/products?q=${encodeURIComponent(modelNumber)}`);
         if (res.ok) {
           const data = await res.json();
-          setSuggestions(data.slice(0, 6));
-          setShowSuggestions(data.length > 0);
+          setSuggestions(data.slice(0, 8));
         }
       } finally {
         setLoading(false);
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [modelNumber]);
+  }, [modelNumber, supplier]);
 
-  // Закриваємо при кліку зовні (для підказок моделі)
+  // Список, який показуємо: моделі постачальника або результати пошуку
+  const displayModels = supplier ? supplierModels : suggestions;
+  const showModels = modelOpen && displayModels.length > 0;
+
+  // Закриваємо dropdown моделі при кліку зовні
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setShowSuggestions(false);
+        setModelOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -92,7 +105,15 @@ export default function ProductAutocomplete({ modelNumber, supplier, price, onSe
       price: product.price ?? "",
       photoPath: product.photoPath ?? undefined,
     });
-    setShowSuggestions(false);
+    setModelOpen(false);
+  }
+
+  function selectSupplier(name: string) {
+    onChange("supplier", name);
+    setSupplierQuery("");
+    setSupplierOpen(false);
+    // після вибору постачальника одразу відкриваємо список його моделей
+    setModelOpen(true);
   }
 
   return (
@@ -128,7 +149,7 @@ export default function ProductAutocomplete({ modelNumber, supplier, price, onSe
                 <button
                   key={s}
                   type="button"
-                  onClick={() => { onChange("supplier", s); setSupplierQuery(""); setSupplierOpen(false); }}
+                  onClick={() => selectSupplier(s)}
                   className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition truncate"
                 >
                   {s}
@@ -154,16 +175,16 @@ export default function ProductAutocomplete({ modelNumber, supplier, price, onSe
         )}
       </div>
 
-      {/* Номер моделі з автодоповненням */}
+      {/* Номер моделі: список моделей обраного постачальника / пошук */}
       <div className="relative">
         <input
           value={modelNumber}
           onChange={(e) => {
             onChange("modelNumber", e.target.value);
-            setShowSuggestions(true);
+            setModelOpen(true);
           }}
-          onFocus={() => modelNumber && setShowSuggestions(suggestions.length > 0)}
-          placeholder="Номер моделі"
+          onFocus={() => setModelOpen(true)}
+          placeholder={supplier ? "Оберіть модель" : "Номер моделі"}
           className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm font-mono"
           autoComplete="off"
         />
@@ -171,10 +192,9 @@ export default function ProductAutocomplete({ modelNumber, supplier, price, onSe
           <div className="absolute right-2 top-2 w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
         )}
 
-        {/* Список підказок */}
-        {showSuggestions && suggestions.length > 0 && (
-          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-            {suggestions.map((p) => (
+        {showModels && (
+          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-auto max-h-56">
+            {displayModels.map((p) => (
               <button
                 key={p.id}
                 type="button"
@@ -202,6 +222,12 @@ export default function ProductAutocomplete({ modelNumber, supplier, price, onSe
                 </div>
               </button>
             ))}
+          </div>
+        )}
+
+        {modelOpen && supplier && supplierModels.length === 0 && (
+          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+            <p className="px-3 py-2 text-xs text-gray-400">Немає моделей у цього постачальника в каталозі</p>
           </div>
         )}
       </div>

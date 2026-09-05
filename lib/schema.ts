@@ -58,6 +58,7 @@ export const orderItems = sqliteTable("order_items", {
   modelNumber: text("model_number"),
   price: text("price"),
   colors: text("colors"),               // JSON: [{ color: "red", qty: 10 }, ...]
+  status: text("status"),               // окремий статус частини (якщо null — наслідує статус замовлення)
   sortOrder: integer("sort_order").notNull().default(0),
 });
 

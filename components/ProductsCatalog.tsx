@@ -60,6 +60,7 @@ export default function ProductsCatalog({
   const [editProduct, setEditProduct] = useState<ProductItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<"default" | "model" | "price-asc" | "price-desc">("default");
 
   // Збираємо унікальних постачальників з усіх товарів
   const allSuppliers = Array.from(
@@ -82,12 +83,38 @@ export default function ProductsCatalog({
     return () => clearTimeout(timer);
   }, [search, fetchProducts]);
 
+  // Парсимо ціну з рядка (напр. "150 ¥" -> 150)
+  function parsePrice(s: string | null | undefined): number {
+    if (!s) return 0;
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  }
+
+  // Сортуємо масив товарів за обраним критерієм
+  function sortProducts(items: ProductItem[]): ProductItem[] {
+    if (sortBy === "default") return items;
+    const arr = [...items];
+    if (sortBy === "model") {
+      return arr.sort((a, b) => a.modelNumber.localeCompare(b.modelNumber, undefined, { numeric: true }));
+    }
+    if (sortBy === "price-asc") {
+      return arr.sort((a, b) => parsePrice(a.price) - parsePrice(b.price));
+    }
+    // price-desc
+    return arr.sort((a, b) => parsePrice(b.price) - parsePrice(a.price));
+  }
+
   const grouped = list.reduce<Record<string, ProductItem[]>>((acc, product) => {
     const key = product.supplier?.trim() || "Без постачальника";
     if (!acc[key]) acc[key] = [];
     acc[key].push(product);
     return acc;
   }, {});
+
+  // Застосовуємо сортування до кожного постачальника
+  for (const key of Object.keys(grouped)) {
+    grouped[key] = sortProducts(grouped[key]);
+  }
 
   const supplierNames = Object.keys(grouped).sort((a, b) => {
     if (a === "Без постачальника") return 1;
@@ -160,6 +187,16 @@ export default function ProductsCatalog({
           <button onClick={collapseAll} className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100 transition">
             Згорнути
           </button>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="default">Сортувати: за замовч.</option>
+            <option value="model">За номером моделі</option>
+            <option value="price-asc">Ціна: зростання</option>
+            <option value="price-desc">Ціна: спадання</option>
+          </select>
           {canEdit && (
             <button
               onClick={() => { setEditProduct(null); setPreselectedSupplier(""); setShowForm(true); }}

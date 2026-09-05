@@ -48,6 +48,11 @@ if (useTurso) {
   const orderColNames = orderCols.map((c: { name: string }) => c.name);
   if (!orderColNames.includes("supplier_total")) sqlite.exec("ALTER TABLE orders ADD COLUMN supplier_total TEXT");
 
+  // Order items — окремий статус частини (постачальника)
+  const itemCols = sqlite.prepare("PRAGMA table_info(order_items)").all() as { name: string }[];
+  const itemColNames = itemCols.map((c: { name: string }) => c.name);
+  if (!itemColNames.includes("status")) sqlite.exec("ALTER TABLE order_items ADD COLUMN status TEXT");
+
   // Products — підтримка кількох фото
   const productCols = sqlite.prepare("PRAGMA table_info(products)").all() as { name: string }[];
   const productColNames = productCols.map((c: { name: string }) => c.name);

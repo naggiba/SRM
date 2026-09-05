@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { orders, Order } from "@/lib/schema";
+import { orders, orderItems, Order, OrderItem } from "@/lib/schema";
 import { desc } from "drizzle-orm";
 import TasksBoard from "@/components/TasksBoard";
 
@@ -11,7 +11,18 @@ export default async function TasksPage() {
   if (!session) redirect("/login");
 
   const role = (session.user as { role: string }).role;
-  const allOrders: Order[] = await db.select().from(orders).orderBy(desc(orders.createdAt));
+
+  const [allOrders, allItems] = await Promise.all([
+    db.select().from(orders).orderBy(desc(orders.createdAt)) as Promise<Order[]>,
+    db.select().from(orderItems) as Promise<OrderItem[]>,
+  ]);
+
+  const data = allOrders.map((o: Order) => ({
+    ...o,
+    items: allItems
+      .filter((i: OrderItem) => i.orderId === o.id)
+      .sort((a: OrderItem, b: OrderItem) => a.sortOrder - b.sortOrder),
+  }));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -26,7 +37,7 @@ export default async function TasksPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <TasksBoard orders={allOrders} canEdit={role !== "VIEWER"} />
+        <TasksBoard orders={data} canEdit={role !== "VIEWER"} />
       </main>
     </div>
   );

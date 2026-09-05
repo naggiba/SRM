@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import type { Order, OrderItem, Payment } from "@/lib/schema";
 
 interface ColorQty {
@@ -190,18 +191,34 @@ export default function OrdersList({
                   {order.items.map((item) => {
                     const colors = parseColors(item.colors);
                     return (
-                      <div key={item.id} className="border border-gray-200 rounded-lg p-2.5 space-y-0.5 text-xs">
-                        {item.supplier && (
-                          <p className="text-gray-700 truncate">{item.supplier}</p>
-                        )}
-                        {item.modelNumber && (
-                          <p className="font-mono text-gray-800 bg-gray-50 px-1.5 py-0.5 rounded inline-block truncate">{item.modelNumber}</p>
-                        )}
-                        {item.price && <p className="text-green-700 font-semibold">{item.price}</p>}
+                      <div key={item.id} className="border border-gray-200 rounded-lg p-2 space-y-1 text-xs">
+                        <div className="flex gap-2">
+                          {item.photoPath && (
+                            <div className="w-32 h-32 shrink-0 bg-gray-100 rounded overflow-hidden">
+                              <Image
+                                src={item.photoPath}
+                                alt={item.modelNumber || "Фото моделі"}
+                                width={128}
+                                height={128}
+                                className="object-cover w-full h-full"
+                                unoptimized
+                              />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            {item.supplier && (
+                              <p className="text-gray-700 truncate">{item.supplier}</p>
+                            )}
+                            {item.modelNumber && (
+                              <p className="font-mono text-gray-800 bg-gray-50 px-1.5 py-0.5 rounded inline-block truncate">{item.modelNumber}</p>
+                            )}
+                            {item.price && <p className="text-green-700 font-semibold">{item.price}</p>}
+                          </div>
+                        </div>
 
                         {/* Colors with qty */}
                         {colors.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
+                          <div className="flex flex-wrap gap-1">
                             {colors.map((c, ci) => (
                               <span key={ci} className="bg-gray-100 px-1.5 py-0.5 rounded">
                                 {c.color} × {c.qty}
